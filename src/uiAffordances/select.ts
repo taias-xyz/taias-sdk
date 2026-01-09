@@ -1,4 +1,5 @@
-import type { CanonicalSlot, Decision, SlotMatch, UiSelections } from "./types";
+import type { Decision } from "../types";
+import type { CanonicalSlot, SlotMatch, UiSelections } from "./types";
 import type { RegistryIndex } from "./indexing";
 import { makeBindingKey } from "./types";
 
