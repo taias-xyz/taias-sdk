@@ -1,3 +1,15 @@
+import type {
+  AffordanceRegistry,
+  SlotMatch,
+  UiSelections,
+} from "./uiAffordances/types";
+
+/**
+ * Generalized decision object.
+ * Currently uses decision.nextTool. The structure supports additional keys.
+ */
+export type Decision = Record<string, string | undefined>;
+
 /**
  * Context passed to a step handler.
  */
@@ -13,10 +25,15 @@ export type StepDecision = {
 };
 
 /**
- * Affordances returned by resolve() with auto-generated advice text.
+ * Affordances returned by resolve():
+ * - advice: LLM guidance text
+ * - decision: generalized decision object (currently includes nextTool)
+ * - selections: UI affordance selections (may be empty)
  */
 export type Affordances = {
   advice: string;
+  decision: Decision;
+  selections: UiSelections;
 };
 
 /**
@@ -55,8 +72,11 @@ export interface FlowBuilder {
  */
 export type TaiasOptions = {
   flow: FlowDefinition;
+  affordances?: AffordanceRegistry;
+  slotMatch?: SlotMatch;
   devMode?: boolean;
   onMissingStep?: (ctx: TaiasContext) => void;
+  onWarn?: (msg: string) => void;
 };
 
 /**

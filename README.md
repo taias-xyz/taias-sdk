@@ -191,7 +191,7 @@ When `devMode: true`, Taias performs additional validation:
 
 1. **Duplicate toolName detection** — Throws an error if a flow defines the same tool name twice:
    ```
-   Taias: Duplicate step for tool 'scan_repo' in flow 'onboard_repo'. V1 supports one handler per tool.
+   Taias: Duplicate step for tool 'scan_repo' in flow 'onboard_repo'. Only one handler per tool is supported.
    ```
 
 2. **Empty nextTool warning** — Logs a warning if a handler returns empty nextTool:
