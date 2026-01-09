@@ -1,4 +1,6 @@
-import type { Affordances, Taias, TaiasContext, TaiasOptions } from "./types";
+import type { Affordances, Taias, TaiasContext, TaiasOptions, Decision } from "./types";
+import { buildRegistryIndex } from "./uiAffordances/indexing";
+import { selectUiAffordances } from "./uiAffordances/select";
 
 /**
  * Generate advice text for a given next tool.
@@ -8,24 +10,34 @@ function generateAdvice(nextTool: string): string {
 }
 
 /**
- * Create a Taias instance from a single flow.
+ * createTaias constructs a decision engine.
  *
- * @param options - Configuration options
- * @returns A Taias instance with a resolve method
+ * Taias resolves tool context into a generalized Decision object,
+ * and then manifests that decision into concrete affordances:
  *
- * @example
- * ```ts
- * const taias = createTaias({
- *   flow: onboardRepoFlow,
- *   devMode: process.env.NODE_ENV !== "production",
- * });
+ *   - LLM guidance (advice)
+ *   - UI affordance selections
  *
- * const decision = await taias.resolve({ toolName: "scan_repo" });
- * // decision.advice → "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
- * ```
+ * Flow logic determines *what should happen next*.
+ * UI affordances determine *how that decision appears in the interface*.
+ *
+ * This file is the boundary where:
+ *
+ *   Inputs → Decision → Manifestations
+ *
+ * are unified into a single resolve() call.
  */
 export function createTaias(options: TaiasOptions): Taias {
-  const { flow, devMode = false, onMissingStep } = options;
+  const {
+    flow,
+    affordances,
+    slotMatch,
+    devMode = false,
+    onMissingStep,
+    onWarn,
+  } = options;
+
+  const warn = onWarn ?? ((msg: string) => console.warn(msg));
 
   // Dev mode: Check for duplicate toolNames
   if (devMode) {
@@ -33,7 +45,7 @@ export function createTaias(options: TaiasOptions): Taias {
     for (const step of flow.steps) {
       if (seenTools.has(step.toolName)) {
         throw new Error(
-          `Taias: Duplicate step for tool '${step.toolName}' in flow '${flow.id}'. V1 supports one handler per tool.`
+          `Taias: Duplicate step for tool '${step.toolName}' in flow '${flow.id}'. Only one handler per tool is supported.`
         );
       }
       seenTools.add(step.toolName);
@@ -41,35 +53,43 @@ export function createTaias(options: TaiasOptions): Taias {
   }
 
   // Build a lookup map for efficient resolution
-  const stepMap = new Map(
-    flow.steps.map((step) => [step.toolName, step.handler])
-  );
+  const stepMap = new Map(flow.steps.map((step) => [step.toolName, step.handler]));
+
+  // Build affordance index once (if provided)
+  const registryIndex = buildRegistryIndex(affordances);
 
   return {
     async resolve(ctx: TaiasContext): Promise<Affordances | null> {
       const handler = stepMap.get(ctx.toolName);
 
       if (!handler) {
-        if (onMissingStep) {
-          onMissingStep(ctx);
-        }
+        onMissingStep?.(ctx);
         return null;
       }
 
       const result = await handler(ctx);
+      if (!result) return null;
 
-      if (!result) {
-        return null;
-      }
-
-      // Dev mode: Warn if nextTool is empty
       if (devMode && result.nextTool === "") {
-        console.warn(`Taias: nextTool for tool '${ctx.toolName}' is empty.`);
+        warn(`Taias: nextTool for tool '${ctx.toolName}' is empty.`);
       }
 
-      // Auto-generate the advice text
+      // Build decision object from flow result
+      const decision: Decision = {
+        nextTool: result.nextTool,
+      };
+
+      // Compute UI selections (may be empty if no registry passed)
+      const selections = selectUiAffordances(decision, registryIndex, {
+        devMode,
+        onWarn: warn,
+        slotMatch,
+      });
+
       return {
         advice: generateAdvice(result.nextTool),
+        decision,
+        selections,
       };
     },
   };

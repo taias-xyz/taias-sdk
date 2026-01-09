@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { defineFlow, createTaias } from "../src";
 import type { TaiasContext } from "../src";
 
-describe("Taias SDK V1", () => {
+describe("Taias", () => {
   describe("defineFlow", () => {
     it("creates a flow definition with id and steps", () => {
       const flow = defineFlow("test_flow", (flow) => {
@@ -137,7 +137,7 @@ describe("Taias SDK V1", () => {
         });
 
         expect(() => createTaias({ flow, devMode: true })).toThrow(
-          "Taias: Duplicate step for tool 'scan_repo' in flow 'test_flow'. V1 supports one handler per tool."
+          "Taias: Duplicate step for tool 'scan_repo' in flow 'test_flow'. Only one handler per tool is supported."
         );
       });
 
@@ -194,7 +194,7 @@ describe("Taias SDK V1", () => {
           expect(consoleWarnSpy).not.toHaveBeenCalled();
         });
 
-        it("does not warn when nextTool is non-empty", async () => {
+        it("does not warn about empty nextTool when nextTool is non-empty", async () => {
           const flow = defineFlow("test_flow", (flow) => {
             flow.step("valid_tool", () => ({ nextTool: "next_tool" }));
           });
@@ -202,7 +202,12 @@ describe("Taias SDK V1", () => {
           const taias = createTaias({ flow, devMode: true });
           await taias.resolve({ toolName: "valid_tool" });
 
-          expect(consoleWarnSpy).not.toHaveBeenCalled();
+          // Should not have the "empty nextTool" warning
+          // (may have other devMode warnings like missing affordances, which is fine)
+          const emptyNextToolWarning = consoleWarnSpy.mock.calls.find(
+            (call) => call[0]?.includes("is empty")
+          );
+          expect(emptyNextToolWarning).toBeUndefined();
         });
       });
     });

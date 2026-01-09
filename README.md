@@ -128,59 +128,10 @@ const affordances = await taias.resolve({ toolName: "scan_repo" });
 - `ctx.toolName` - The name of the tool being called
 
 **Returns:** `Affordances | null`
-- Returns `{ advice: string }` with auto-generated advice if a matching step is found
+- Returns an `Affordances` object with `advice` (and more) if a matching step is found
 - Returns `null` if no step matches or handler returns null
 
-## Types
-
-<details>
-<summary>View all types</summary>
-
-```ts
-type TaiasContext = {
-  toolName: string;
-};
-
-type StepDecision = {
-  nextTool: string;
-};
-
-type Affordances = {
-  advice: string;
-};
-
-type StepHandler = (
-  ctx: TaiasContext
-) => StepDecision | null | Promise<StepDecision | null>;
-
-type FlowStep = {
-  toolName: string;
-  handler: StepHandler;
-};
-
-type FlowDefinition = {
-  id: string;
-  steps: Array<FlowStep>;
-};
-
-interface FlowBuilder {
-  step(toolName: string, handler: StepHandler): void;
-}
-
-type TaiasOptions = {
-  flow: FlowDefinition;
-  devMode?: boolean;
-  onMissingStep?: (ctx: TaiasContext) => void;
-};
-
-interface Taias {
-  resolve(ctx: TaiasContext): Affordances | null | Promise<Affordances | null>;
-}
-```
-
-</details>
-
-See the [full documentation](https://taias.xyz/docs) for more details.
+See the [full documentation](https://taias.xyz/docs) for complete API reference and types.
 
 ## Dev Mode
 
@@ -191,7 +142,7 @@ When `devMode: true`, Taias performs additional validation:
 
 1. **Duplicate toolName detection** — Throws an error if a flow defines the same tool name twice:
    ```
-   Taias: Duplicate step for tool 'scan_repo' in flow 'onboard_repo'. V1 supports one handler per tool.
+   Taias: Duplicate step for tool 'scan_repo' in flow 'onboard_repo'. Only one handler per tool is supported.
    ```
 
 2. **Empty nextTool warning** — Logs a warning if a handler returns empty nextTool:
