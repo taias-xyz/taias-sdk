@@ -1,4 +1,4 @@
-import type { AffordanceRegistry } from "./types";
+import type { AffordanceRegistry, DefaultSlots } from "./types";
 import { makeBindingKey } from "./types";
 
 export type MergeAffordancesOptions = {
@@ -6,14 +6,29 @@ export type MergeAffordancesOptions = {
   onWarn?: (msg: string) => void;
 };
 
-export function mergeAffordances(
-  registries: AffordanceRegistry[],
+/**
+ * Merge multiple affordance registries into one.
+ * Generic over slot type S for custom slot support.
+ *
+ * @example Default slots
+ * ```ts
+ * const merged = mergeAffordances([widgetA, widgetB]);
+ * ```
+ *
+ * @example Custom slots
+ * ```ts
+ * type MySlots = "primaryCta" | "contentArea";
+ * const merged = mergeAffordances<MySlots>([widgetA, widgetB]);
+ * ```
+ */
+export function mergeAffordances<S extends string = DefaultSlots>(
+  registries: AffordanceRegistry<S>[],
   opts: MergeAffordancesOptions = {}
-): AffordanceRegistry {
+): AffordanceRegistry<S> {
   const devMode = !!opts.devMode;
   const warn = opts.onWarn ?? (() => {});
 
-  const merged: AffordanceRegistry = { handles: registries.flatMap((r) => r.handles) };
+  const merged: AffordanceRegistry<S> = { handles: registries.flatMap((r) => r.handles) };
 
   if (!devMode) return merged;
 

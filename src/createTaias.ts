@@ -1,4 +1,5 @@
 import type { Affordances, Taias, TaiasContext, TaiasOptions, Decision } from "./types";
+import type { DefaultSlots } from "./uiAffordances/types";
 import { buildRegistryIndex } from "./uiAffordances/indexing";
 import { selectUiAffordances } from "./uiAffordances/select";
 
@@ -26,8 +27,25 @@ function generateAdvice(nextTool: string): string {
  *   Inputs → Decision → Manifestations
  *
  * are unified into a single resolve() call.
+ *
+ * @example Default slots (backwards compatible)
+ * ```ts
+ * const taias = createTaias({ flow, affordances });
+ * ```
+ *
+ * @example Custom slots (fully type-safe)
+ * ```ts
+ * type MySlots = "primaryCta" | "contentArea" | "headerStyle";
+ * const taias = createTaias<MySlots>({
+ *   flow,
+ *   affordances,
+ *   slotMatch: { contentArea: "contentArea", headerStyle: "headerStyle" },
+ * });
+ * ```
  */
-export function createTaias(options: TaiasOptions): Taias {
+export function createTaias<S extends string = DefaultSlots>(
+  options: TaiasOptions<S>
+): Taias<S> {
   const {
     flow,
     affordances,
@@ -56,10 +74,10 @@ export function createTaias(options: TaiasOptions): Taias {
   const stepMap = new Map(flow.steps.map((step) => [step.toolName, step.handler]));
 
   // Build affordance index once (if provided)
-  const registryIndex = buildRegistryIndex(affordances);
+  const registryIndex = buildRegistryIndex<S>(affordances);
 
   return {
-    async resolve(ctx: TaiasContext): Promise<Affordances | null> {
+    async resolve(ctx: TaiasContext): Promise<Affordances<S> | null> {
       const handler = stepMap.get(ctx.toolName);
 
       if (!handler) {
@@ -78,7 +96,7 @@ export function createTaias(options: TaiasOptions): Taias {
       const decision: Decision = { ...result };
 
       // Compute UI selections (may be empty if no registry passed)
-      const selections = selectUiAffordances(decision, registryIndex, {
+      const selections = selectUiAffordances<S>(decision, registryIndex, {
         devMode,
         onWarn: warn,
         slotMatch,

@@ -1,34 +1,46 @@
 import type { Decision } from "../types";
-import type { CanonicalSlot, SlotMatch, UiSelections } from "./types";
+import type { DefaultSlots, SlotMatch, UiSelections } from "./types";
 import type { RegistryIndex } from "./indexing";
 import { makeBindingKey } from "./types";
 
-const DEFAULT_SLOT_MATCH: Required<Record<CanonicalSlot, string>> = {
+/**
+ * Default slot-to-field mappings for the canonical slots.
+ * Custom slots default to "nextTool" if not specified in slotMatch.
+ */
+const DEFAULT_SLOT_MATCH: Record<DefaultSlots, string> = {
   primaryCta: "nextTool",
   secondaryCta: "nextTool",
   widgetVariant: "nextTool",
 };
 
-export type SelectOptions = {
-  slotMatch?: SlotMatch;
+export type SelectOptions<S extends string = DefaultSlots> = {
+  slotMatch?: SlotMatch<S>;
   devMode?: boolean;
   onWarn?: (msg: string) => void;
 };
 
-export function selectUiAffordances(
+/**
+ * Select UI affordances based on flow decision.
+ * Iterates over registered slots (from index) rather than hardcoded list.
+ */
+export function selectUiAffordances<S extends string = DefaultSlots>(
   decision: Decision,
-  index: RegistryIndex,
-  opts: SelectOptions = {}
-): UiSelections {
-  const slotMatch = { ...DEFAULT_SLOT_MATCH, ...(opts.slotMatch ?? {}) };
+  index: RegistryIndex<S>,
+  opts: SelectOptions<S> = {}
+): UiSelections<S> {
+  const slotMatch = opts.slotMatch as Record<string, string> | undefined;
   const devMode = !!opts.devMode;
   const warn = opts.onWarn ?? (() => {});
 
-  const selections: UiSelections = {};
-  const slots = Object.keys(DEFAULT_SLOT_MATCH) as CanonicalSlot[];
+  const selections: UiSelections<S> = {};
 
-  for (const slot of slots) {
-    const field = slotMatch[slot];
+  // Iterate over registered slots, not hardcoded list
+  for (const slot of index.slots) {
+    // Use custom slotMatch, then DEFAULT_SLOT_MATCH for canonical slots, then "nextTool"
+    const field =
+      slotMatch?.[slot] ??
+      DEFAULT_SLOT_MATCH[slot as DefaultSlots] ??
+      "nextTool";
     const value = decision[field];
     if (!value) continue;
 
@@ -40,7 +52,10 @@ export function selectUiAffordances(
       continue;
     }
 
-    selections[slot] = { handleId: handle.handleId, bindsTo: handle.bindsTo };
+    (selections as Record<string, unknown>)[slot] = {
+      handleId: handle.handleId,
+      bindsTo: handle.bindsTo,
+    };
   }
 
   return selections;

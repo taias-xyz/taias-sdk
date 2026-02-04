@@ -551,5 +551,189 @@ describe("UI Affordances", () => {
       expect(afterRecommendations?.selections.widgetVariant?.handleId).toBe("tracks.variant.playlist");
     });
   });
+
+  describe("custom slots", () => {
+    it("registers handles for custom slots", () => {
+      type MySlots = "primaryCta" | "contentArea";
+      const registry = defineAffordances<MySlots>((r) => {
+        r.primaryCta("cta.create", { toolName: "createUser" });
+        r.contentArea("content.form", { toolName: "createUser" });
+      });
+
+      expect(registry.handles).toHaveLength(2);
+      expect(registry.handles[0].slot).toBe("primaryCta");
+      expect(registry.handles[1].slot).toBe("contentArea");
+    });
+
+    it("selects handles for custom slots via slotMatch", async () => {
+      type MySlots = "primaryCta" | "contentArea";
+
+      const flow = defineFlow("test_flow", (f) => {
+        f.step("tool_a", () => ({
+          nextTool: "tool_b",
+          contentArea: "form_b",
+        }));
+      });
+
+      const affordances = defineAffordances<MySlots>((r) => {
+        r.primaryCta("cta.b", { toolName: "tool_b" });
+        r.contentArea("content.b", { key: "contentArea", value: "form_b" });
+      });
+
+      const taias = createTaias<MySlots>({
+        flow,
+        affordances: mergeAffordances([affordances]),
+        slotMatch: { contentArea: "contentArea" },
+      });
+
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.b");
+      expect(result?.selections.contentArea?.handleId).toBe("content.b");
+    });
+
+    it("only selects registered slots (ignores unregistered canonical slots)", async () => {
+      type MySlots = "contentArea";
+
+      const flow = defineFlow("test_flow", (f) => {
+        f.step("tool_a", () => ({ nextTool: "tool_b" }));
+      });
+
+      const affordances = defineAffordances<MySlots>((r) => {
+        r.contentArea("content.b", { toolName: "tool_b" });
+      });
+
+      const taias = createTaias<MySlots>({
+        flow,
+        affordances: mergeAffordances([affordances]),
+      });
+
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      // Only contentArea should be selected (defaults to nextTool)
+      expect(result?.selections.contentArea?.handleId).toBe("content.b");
+      // primaryCta and others should not exist since not registered
+      expect(Object.keys(result?.selections ?? {})).toEqual(["contentArea"]);
+    });
+
+    it("supports fully custom slot sets without canonical slots", async () => {
+      type DashboardSlots = "headerWidget" | "mainPanel" | "sidebar";
+
+      const flow = defineFlow("dashboard_flow", (f) => {
+        f.step("load_dashboard", () => ({
+          nextTool: "refresh",
+          headerWidget: "stats",
+          mainPanel: "chart",
+          sidebar: "filters",
+        }));
+      });
+
+      const affordances = defineAffordances<DashboardSlots>((r) => {
+        r.headerWidget("header.stats", { key: "headerWidget", value: "stats" });
+        r.mainPanel("main.chart", { key: "mainPanel", value: "chart" });
+        r.sidebar("sidebar.filters", { key: "sidebar", value: "filters" });
+      });
+
+      const taias = createTaias<DashboardSlots>({
+        flow,
+        affordances: mergeAffordances([affordances]),
+        slotMatch: {
+          headerWidget: "headerWidget",
+          mainPanel: "mainPanel",
+          sidebar: "sidebar",
+        },
+      });
+
+      const result = await taias.resolve({ toolName: "load_dashboard" });
+
+      expect(result?.selections.headerWidget?.handleId).toBe("header.stats");
+      expect(result?.selections.mainPanel?.handleId).toBe("main.chart");
+      expect(result?.selections.sidebar?.handleId).toBe("sidebar.filters");
+    });
+
+    it("full onboarding flow integration with custom slots", async () => {
+      type OnboardingSlots = "primaryCta" | "secondaryCta" | "contentArea" | "headerStyle";
+
+      const flow = defineFlow("onboarding", (f) => {
+        f.step("createUser", () => ({
+          nextTool: "startImport",
+          primaryAction: "startImport",
+          secondaryAction: "manualSetup",
+          contentArea: "path-choice",
+          headerStyle: "progress",
+        }));
+      });
+
+      const affordances = defineAffordances<OnboardingSlots>((r) => {
+        r.primaryCta("cta.import", { key: "primaryAction", value: "startImport" });
+        r.secondaryCta("cta.manual", { key: "secondaryAction", value: "manualSetup" });
+        r.contentArea("content.path-choice", { key: "contentArea", value: "path-choice" });
+        r.headerStyle("header.progress", { key: "headerStyle", value: "progress" });
+      });
+
+      const taias = createTaias<OnboardingSlots>({
+        flow,
+        affordances: mergeAffordances([affordances]),
+        slotMatch: {
+          primaryCta: "primaryAction",
+          secondaryCta: "secondaryAction",
+          contentArea: "contentArea",
+          headerStyle: "headerStyle",
+        },
+      });
+
+      const result = await taias.resolve({ toolName: "createUser" });
+
+      // LLM advice still uses nextTool
+      expect(result?.advice).toContain("startImport");
+
+      // Each slot matches its own decision field
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.import");
+      expect(result?.selections.secondaryCta?.handleId).toBe("cta.manual");
+      expect(result?.selections.contentArea?.handleId).toBe("content.path-choice");
+      expect(result?.selections.headerStyle?.handleId).toBe("header.progress");
+
+      // Decision object contains all fields
+      expect(result?.decision).toEqual({
+        nextTool: "startImport",
+        primaryAction: "startImport",
+        secondaryAction: "manualSetup",
+        contentArea: "path-choice",
+        headerStyle: "progress",
+      });
+    });
+
+    it("type-checks slot names at compile time", () => {
+      type MySlots = "primaryCta" | "contentArea";
+
+      // This test verifies the Proxy-based approach works at runtime
+      // TypeScript catches invalid slots at compile time (verified manually)
+      const registry = defineAffordances<MySlots>((r) => {
+        r.primaryCta("cta", { toolName: "x" });
+        r.contentArea("content", { toolName: "x" });
+        // r.invalidSlot("x", { toolName: "x" }); // Would be a type error
+      });
+
+      expect(registry.handles).toHaveLength(2);
+    });
+
+    it("merges custom slot registries correctly", () => {
+      type MySlots = "primaryCta" | "contentArea";
+
+      const registry1 = defineAffordances<MySlots>((r) => {
+        r.primaryCta("cta.a", { toolName: "tool_a" });
+      });
+
+      const registry2 = defineAffordances<MySlots>((r) => {
+        r.contentArea("content.b", { toolName: "tool_b" });
+      });
+
+      const merged = mergeAffordances<MySlots>([registry1, registry2]);
+
+      expect(merged.handles).toHaveLength(2);
+      expect(merged.handles[0].slot).toBe("primaryCta");
+      expect(merged.handles[1].slot).toBe("contentArea");
+    });
+  });
 });
 

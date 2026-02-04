@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0] - 2025-02-04
+
+### Added
+- **Custom slots support** - Define your own slot types with full TypeScript type safety
+  - Use generics to specify custom slots: `defineAffordances<MySlots>((r) => { ... })`
+  - Proxy-based registrar dynamically creates typed methods for any slot name
+  - Full autocomplete and compile-time error checking for custom slot names
+- **`DefaultSlots` type** - Exported type for the three default slots (`primaryCta`, `secondaryCta`, `widgetVariant`)
+- **`AffordanceRegistrar<S>` type** - Exported mapped type for custom registrar interfaces
+
+### Changed
+- All UI affordance types are now generic over slot type `S`:
+  - `HandleRegistration<S>`, `AffordanceRegistry<S>`, `UiSelections<S>`, `SlotMatch<S>`
+  - `Affordances<S>`, `TaiasOptions<S>`, `Taias<S>`
+- `defineAffordances<S>()`, `mergeAffordances<S>()`, `createTaias<S>()` now accept generic slot type
+- Selection logic iterates over registered slots instead of hardcoded list
+- Registry index now tracks which slots have been registered
+
+### Backwards Compatible
+- All generics default to `DefaultSlots`, so existing code works unchanged
+- `CanonicalSlot` remains as a deprecated alias for `DefaultSlots`
+
 ## [0.3.0] - 2025-02-04
 
 ### Added

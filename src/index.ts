@@ -5,7 +5,9 @@ export { createTaias } from "./createTaias";
 // UI affordances exports
 export { defineAffordances } from "./uiAffordances/defineAffordances";
 export { mergeAffordances } from "./uiAffordances/mergeAffordances";
+export type { AffordanceRegistrar } from "./uiAffordances/defineAffordances";
 export type {
+  DefaultSlots,
   CanonicalSlot,
   Binding,
   BindingInput,
@@ -18,7 +20,7 @@ export type {
 
 // Core + flow type exports
 export type {
-  Decision, // moved to core
+  Decision,
   TaiasContext,
   StepDecision,
   Affordances,
