@@ -74,10 +74,8 @@ export function createTaias(options: TaiasOptions): Taias {
         warn(`Taias: nextTool for tool '${ctx.toolName}' is empty.`);
       }
 
-      // Build decision object from flow result
-      const decision: Decision = {
-        nextTool: result.nextTool,
-      };
+      // Build decision object from flow result (spread all fields)
+      const decision: Decision = { ...result };
 
       // Compute UI selections (may be empty if no registry passed)
       const selections = selectUiAffordances(decision, registryIndex, {
