@@ -1,12 +1,13 @@
 import type {
   AffordanceRegistry,
+  DefaultSlots,
   SlotMatch,
   UiSelections,
 } from "./uiAffordances/types";
 
 /**
  * Generalized decision object.
- * Currently uses decision.nextTool. The structure supports additional keys.
+ * Contains nextTool plus any custom fields returned by step handlers.
  */
 export type Decision = Record<string, string | undefined>;
 
@@ -29,13 +30,15 @@ export type StepDecision = {
 /**
  * Affordances returned by resolve():
  * - advice: LLM guidance text
- * - decision: generalized decision object (currently includes nextTool)
+ * - decision: generalized decision object (contains nextTool + custom fields)
  * - selections: UI affordance selections (may be empty)
+ *
+ * Generic over slot type S for custom slot support.
  */
-export type Affordances = {
+export type Affordances<S extends string = DefaultSlots> = {
   advice: string;
   decision: Decision;
-  selections: UiSelections;
+  selections: UiSelections<S>;
 };
 
 /**
@@ -71,11 +74,12 @@ export interface FlowBuilder {
 
 /**
  * Options for creating a Taias instance.
+ * Generic over slot type S for custom slot support.
  */
-export type TaiasOptions = {
+export type TaiasOptions<S extends string = DefaultSlots> = {
   flow: FlowDefinition;
-  affordances?: AffordanceRegistry;
-  slotMatch?: SlotMatch;
+  affordances?: AffordanceRegistry<S>;
+  slotMatch?: SlotMatch<S>;
   devMode?: boolean;
   onMissingStep?: (ctx: TaiasContext) => void;
   onWarn?: (msg: string) => void;
@@ -83,7 +87,8 @@ export type TaiasOptions = {
 
 /**
  * The Taias instance interface.
+ * Generic over slot type S for custom slot support.
  */
-export interface Taias {
-  resolve(ctx: TaiasContext): Affordances | null | Promise<Affordances | null>;
+export interface Taias<S extends string = DefaultSlots> {
+  resolve(ctx: TaiasContext): Affordances<S> | null | Promise<Affordances<S> | null>;
 }
