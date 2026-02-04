@@ -307,6 +307,129 @@ describe("UI Affordances", () => {
     });
   });
 
+  describe("multi-field decisions", () => {
+    it("passes custom fields through to decision object", async () => {
+      const flow = defineFlow("test_flow", (flow) => {
+        flow.step("tool_a", () => ({
+          nextTool: "tool_b",
+          customField: "custom_value",
+        }));
+      });
+
+      const taias = createTaias({ flow });
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      expect(result?.decision).toEqual({
+        nextTool: "tool_b",
+        customField: "custom_value",
+      });
+    });
+
+    it("allows different slots to match different decision fields", async () => {
+      const flow = defineFlow("test_flow", (flow) => {
+        flow.step("tool_a", () => ({
+          nextTool: "primary_tool",
+          secondaryAction: "secondary_tool",
+          contentArea: "content_variant",
+        }));
+      });
+
+      const affordances = defineAffordances((r) => {
+        r.primaryCta("cta.primary", { key: "nextTool", value: "primary_tool" });
+        r.secondaryCta("cta.secondary", { key: "secondaryAction", value: "secondary_tool" });
+        r.widgetVariant("variant.content", { key: "contentArea", value: "content_variant" });
+      });
+
+      const taias = createTaias({
+        flow,
+        affordances: mergeAffordances([affordances]),
+        slotMatch: {
+          primaryCta: "nextTool",
+          secondaryCta: "secondaryAction",
+          widgetVariant: "contentArea",
+        },
+      });
+
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.primary");
+      expect(result?.selections.secondaryCta?.handleId).toBe("cta.secondary");
+      expect(result?.selections.widgetVariant?.handleId).toBe("variant.content");
+    });
+
+    it("supports onboarding flow use case with independent slot decisions", async () => {
+      // Simulates the developer feedback use case
+      const onboardingFlow = defineFlow("onboarding_flow", (flow) => {
+        flow.step("createUser", () => ({
+          nextTool: "startImport",
+          primaryAction: "startImport",
+          secondaryAction: "startManualSetup",
+          contentArea: "path-choice",
+        }));
+      });
+
+      const affordances = defineAffordances((r) => {
+        // Primary CTA - the recommended path
+        r.primaryCta("cta.start-import", { key: "primaryAction", value: "startImport" });
+        // Secondary CTA - the alternative path
+        r.secondaryCta("cta.start-manual", { key: "secondaryAction", value: "startManualSetup" });
+        // Widget variant - which content to show
+        r.widgetVariant("content.path-choice", { key: "contentArea", value: "path-choice" });
+      });
+
+      const taias = createTaias({
+        flow: onboardingFlow,
+        affordances: mergeAffordances([affordances]),
+        slotMatch: {
+          primaryCta: "primaryAction",
+          secondaryCta: "secondaryAction",
+          widgetVariant: "contentArea",
+        },
+      });
+
+      const result = await taias.resolve({ toolName: "createUser" });
+
+      // LLM advice still uses nextTool
+      expect(result?.advice).toContain("startImport");
+
+      // Each slot matches its own decision field
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.start-import");
+      expect(result?.selections.secondaryCta?.handleId).toBe("cta.start-manual");
+      expect(result?.selections.widgetVariant?.handleId).toBe("content.path-choice");
+
+      // Decision object contains all fields
+      expect(result?.decision).toEqual({
+        nextTool: "startImport",
+        primaryAction: "startImport",
+        secondaryAction: "startManualSetup",
+        contentArea: "path-choice",
+      });
+    });
+
+    it("maintains backwards compatibility with nextTool-only handlers", async () => {
+      const flow = defineFlow("test_flow", (flow) => {
+        flow.step("tool_a", () => ({ nextTool: "tool_b" }));
+      });
+
+      const affordances = defineAffordances((r) => {
+        r.primaryCta("cta.b", { toolName: "tool_b" });
+        r.secondaryCta("secondary.b", { toolName: "tool_b" });
+      });
+
+      const taias = createTaias({
+        flow,
+        affordances: mergeAffordances([affordances]),
+      });
+
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      // Should work exactly as before
+      expect(result?.decision).toEqual({ nextTool: "tool_b" });
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.b");
+      expect(result?.selections.secondaryCta?.handleId).toBe("secondary.b");
+    });
+  });
+
   describe("devMode warnings for missing affordances", () => {
     let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 

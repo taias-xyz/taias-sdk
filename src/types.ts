@@ -19,9 +19,11 @@ export type TaiasContext = {
 
 /**
  * Decision returned by a step handler specifying the next tool.
+ * Additional custom fields can be included for multi-dimensional UI control.
  */
 export type StepDecision = {
   nextTool: string;
+  [key: string]: string;
 };
 
 /**

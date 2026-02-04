@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2025-02-04
+
+### Added
+- **Multi-field decision support** - Step handlers can now return custom fields beyond `nextTool`
+  - Enables independent UI control for each slot (primaryCta, secondaryCta, widgetVariant)
+  - Use `slotMatch` to map different slots to different decision fields
+  - All custom fields are passed through to the `decision` object
+
+### Changed
+- `StepDecision` type now accepts additional string fields via index signature
+- Decision extraction spreads all handler fields instead of only `nextTool`
+
 ## [0.2.1] - 2025-01-09
 
 ### Fixed
