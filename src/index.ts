@@ -15,7 +15,6 @@ export type {
   Selection,
   UiSelections,
   AffordanceRegistry,
-  SlotMatch,
 } from "./uiAffordances/types";
 
 // Core + flow type exports

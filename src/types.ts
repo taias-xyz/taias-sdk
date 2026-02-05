@@ -1,7 +1,6 @@
 import type {
   AffordanceRegistry,
   DefaultSlots,
-  SlotMatch,
   UiSelections,
 } from "./uiAffordances/types";
 
@@ -79,7 +78,6 @@ export interface FlowBuilder {
 export type TaiasOptions<S extends string = DefaultSlots> = {
   flow: FlowDefinition;
   affordances?: AffordanceRegistry<S>;
-  slotMatch?: SlotMatch<S>;
   devMode?: boolean;
   onMissingStep?: (ctx: TaiasContext) => void;
   onWarn?: (msg: string) => void;

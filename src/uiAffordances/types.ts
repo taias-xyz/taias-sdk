@@ -51,12 +51,6 @@ export type AffordanceRegistry<S extends string = DefaultSlots> = {
   handles: HandleRegistration<S>[];
 };
 
-/**
- * Mapping of slots to decision fields.
- * Generic over slot type S for custom slot support.
- */
-export type SlotMatch<S extends string = DefaultSlots> = Partial<Record<S, string>>;
-
 export function normalizeBinding(input: BindingInput): Binding {
   if ("toolName" in input) return { key: "nextTool", value: input.toolName };
   return { key: input.key, value: input.value };

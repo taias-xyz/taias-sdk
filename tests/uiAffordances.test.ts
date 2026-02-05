@@ -284,29 +284,6 @@ describe("UI Affordances", () => {
     });
   });
 
-  describe("slotMatch option", () => {
-    it("allows custom slot-to-decision-field mapping", async () => {
-      const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "tool_b" }));
-      });
-
-      // Register handle with generalized binding
-      const affordances = defineAffordances((r) => {
-        r.primaryCta("custom.cta", { key: "nextTool", value: "tool_b" });
-      });
-
-      const taias = createTaias({
-        flow,
-        affordances: mergeAffordances([affordances]),
-        slotMatch: { primaryCta: "nextTool" },
-      });
-
-      const result = await taias.resolve({ toolName: "tool_a" });
-
-      expect(result?.selections.primaryCta?.handleId).toBe("custom.cta");
-    });
-  });
-
   describe("multi-field decisions", () => {
     it("passes custom fields through to decision object", async () => {
       const flow = defineFlow("test_flow", (flow) => {
@@ -325,7 +302,7 @@ describe("UI Affordances", () => {
       });
     });
 
-    it("allows different slots to match different decision fields", async () => {
+    it("allows different slots to match different decision fields (inferred from bindings)", async () => {
       const flow = defineFlow("test_flow", (flow) => {
         flow.step("tool_a", () => ({
           nextTool: "primary_tool",
@@ -334,6 +311,7 @@ describe("UI Affordances", () => {
         }));
       });
 
+      // Each binding declares which decision field it matches - no slotMatch needed
       const affordances = defineAffordances((r) => {
         r.primaryCta("cta.primary", { key: "nextTool", value: "primary_tool" });
         r.secondaryCta("cta.secondary", { key: "secondaryAction", value: "secondary_tool" });
@@ -343,11 +321,6 @@ describe("UI Affordances", () => {
       const taias = createTaias({
         flow,
         affordances: mergeAffordances([affordances]),
-        slotMatch: {
-          primaryCta: "nextTool",
-          secondaryCta: "secondaryAction",
-          widgetVariant: "contentArea",
-        },
       });
 
       const result = await taias.resolve({ toolName: "tool_a" });
@@ -368,6 +341,7 @@ describe("UI Affordances", () => {
         }));
       });
 
+      // Each binding declares its key - decision field is inferred automatically
       const affordances = defineAffordances((r) => {
         // Primary CTA - the recommended path
         r.primaryCta("cta.start-import", { key: "primaryAction", value: "startImport" });
@@ -380,11 +354,6 @@ describe("UI Affordances", () => {
       const taias = createTaias({
         flow: onboardingFlow,
         affordances: mergeAffordances([affordances]),
-        slotMatch: {
-          primaryCta: "primaryAction",
-          secondaryCta: "secondaryAction",
-          widgetVariant: "contentArea",
-        },
       });
 
       const result = await taias.resolve({ toolName: "createUser" });
@@ -392,7 +361,7 @@ describe("UI Affordances", () => {
       // LLM advice still uses nextTool
       expect(result?.advice).toContain("startImport");
 
-      // Each slot matches its own decision field
+      // Each slot matches its own decision field (inferred from bindings)
       expect(result?.selections.primaryCta?.handleId).toBe("cta.start-import");
       expect(result?.selections.secondaryCta?.handleId).toBe("cta.start-manual");
       expect(result?.selections.widgetVariant?.handleId).toBe("content.path-choice");
@@ -565,7 +534,7 @@ describe("UI Affordances", () => {
       expect(registry.handles[1].slot).toBe("contentArea");
     });
 
-    it("selects handles for custom slots via slotMatch", async () => {
+    it("selects handles for custom slots (inferred from bindings)", async () => {
       type MySlots = "primaryCta" | "contentArea";
 
       const flow = defineFlow("test_flow", (f) => {
@@ -575,6 +544,7 @@ describe("UI Affordances", () => {
         }));
       });
 
+      // Each binding declares its key - no slotMatch needed
       const affordances = defineAffordances<MySlots>((r) => {
         r.primaryCta("cta.b", { toolName: "tool_b" });
         r.contentArea("content.b", { key: "contentArea", value: "form_b" });
@@ -583,7 +553,6 @@ describe("UI Affordances", () => {
       const taias = createTaias<MySlots>({
         flow,
         affordances: mergeAffordances([affordances]),
-        slotMatch: { contentArea: "contentArea" },
       });
 
       const result = await taias.resolve({ toolName: "tool_a" });
@@ -628,6 +597,7 @@ describe("UI Affordances", () => {
         }));
       });
 
+      // Bindings declare the key - decision field is inferred automatically
       const affordances = defineAffordances<DashboardSlots>((r) => {
         r.headerWidget("header.stats", { key: "headerWidget", value: "stats" });
         r.mainPanel("main.chart", { key: "mainPanel", value: "chart" });
@@ -637,11 +607,6 @@ describe("UI Affordances", () => {
       const taias = createTaias<DashboardSlots>({
         flow,
         affordances: mergeAffordances([affordances]),
-        slotMatch: {
-          headerWidget: "headerWidget",
-          mainPanel: "mainPanel",
-          sidebar: "sidebar",
-        },
       });
 
       const result = await taias.resolve({ toolName: "load_dashboard" });
@@ -664,6 +629,7 @@ describe("UI Affordances", () => {
         }));
       });
 
+      // Each binding declares its key - decision fields are inferred automatically
       const affordances = defineAffordances<OnboardingSlots>((r) => {
         r.primaryCta("cta.import", { key: "primaryAction", value: "startImport" });
         r.secondaryCta("cta.manual", { key: "secondaryAction", value: "manualSetup" });
@@ -674,12 +640,6 @@ describe("UI Affordances", () => {
       const taias = createTaias<OnboardingSlots>({
         flow,
         affordances: mergeAffordances([affordances]),
-        slotMatch: {
-          primaryCta: "primaryAction",
-          secondaryCta: "secondaryAction",
-          contentArea: "contentArea",
-          headerStyle: "headerStyle",
-        },
       });
 
       const result = await taias.resolve({ toolName: "createUser" });
@@ -687,7 +647,7 @@ describe("UI Affordances", () => {
       // LLM advice still uses nextTool
       expect(result?.advice).toContain("startImport");
 
-      // Each slot matches its own decision field
+      // Each slot matches its own decision field (inferred from bindings)
       expect(result?.selections.primaryCta?.handleId).toBe("cta.import");
       expect(result?.selections.secondaryCta?.handleId).toBe("cta.manual");
       expect(result?.selections.contentArea?.handleId).toBe("content.path-choice");
@@ -733,6 +693,104 @@ describe("UI Affordances", () => {
       expect(merged.handles).toHaveLength(2);
       expect(merged.handles[0].slot).toBe("primaryCta");
       expect(merged.handles[1].slot).toBe("contentArea");
+    });
+  });
+
+  describe("key inference from bindings", () => {
+    it("infers decision field from affordance bindings", async () => {
+      const flow = defineFlow("test_flow", (f) => {
+        f.step("tool_a", () => ({
+          nextTool: "tool_b",
+          customField: "custom_value",
+        }));
+      });
+
+      // primaryCta uses nextTool (via toolName shorthand)
+      // widgetVariant uses customField (via explicit key)
+      const affordances = defineAffordances((r) => {
+        r.primaryCta("cta.b", { toolName: "tool_b" });
+        r.widgetVariant("variant.custom", { key: "customField", value: "custom_value" });
+      });
+
+      const taias = createTaias({
+        flow,
+        affordances: mergeAffordances([affordances]),
+      });
+
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      // Both should be selected - keys inferred from bindings
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.b");
+      expect(result?.selections.widgetVariant?.handleId).toBe("variant.custom");
+    });
+
+    it("throws on conflicting keys for same slot", () => {
+      const affordances = defineAffordances((r) => {
+        r.primaryCta("cta.a", { key: "fieldA", value: "value_a" });
+        r.primaryCta("cta.b", { key: "fieldB", value: "value_b" }); // Different key!
+      });
+
+      const flow = defineFlow("test_flow", (f) => {
+        f.step("tool_a", () => ({ nextTool: "x" }));
+      });
+
+      // Should throw when building the index (during createTaias)
+      expect(() =>
+        createTaias({
+          flow,
+          affordances: mergeAffordances([affordances]),
+        })
+      ).toThrow(
+        '[Taias] Slot "primaryCta" has handles bound to different keys: "fieldA" and "fieldB"'
+      );
+    });
+
+    it("allows same key across different slots", async () => {
+      const flow = defineFlow("test_flow", (f) => {
+        f.step("tool_a", () => ({ nextTool: "tool_b" }));
+      });
+
+      // All slots use nextTool - this is fine
+      const affordances = defineAffordances((r) => {
+        r.primaryCta("cta.b", { toolName: "tool_b" });
+        r.secondaryCta("secondary.b", { toolName: "tool_b" });
+        r.widgetVariant("variant.b", { toolName: "tool_b" });
+      });
+
+      const taias = createTaias({
+        flow,
+        affordances: mergeAffordances([affordances]),
+      });
+
+      const result = await taias.resolve({ toolName: "tool_a" });
+
+      expect(result?.selections.primaryCta?.handleId).toBe("cta.b");
+      expect(result?.selections.secondaryCta?.handleId).toBe("secondary.b");
+      expect(result?.selections.widgetVariant?.handleId).toBe("variant.b");
+    });
+
+    it("allows multiple handles for same slot with same key but different values", async () => {
+      const flow = defineFlow("test_flow", (f) => {
+        f.step("tool_a", () => ({ nextTool: "tool_b" }));
+        f.step("tool_b", () => ({ nextTool: "tool_c" }));
+      });
+
+      // Multiple primaryCta handles, all using nextTool but with different values
+      const affordances = defineAffordances((r) => {
+        r.primaryCta("cta.b", { toolName: "tool_b" });
+        r.primaryCta("cta.c", { toolName: "tool_c" });
+      });
+
+      const taias = createTaias({
+        flow,
+        affordances: mergeAffordances([affordances]),
+      });
+
+      const resultA = await taias.resolve({ toolName: "tool_a" });
+      expect(resultA?.selections.primaryCta?.handleId).toBe("cta.b");
+
+      const resultB = await taias.resolve({ toolName: "tool_b" });
+      expect(resultB?.selections.primaryCta?.handleId).toBe("cta.c");
     });
   });
 });
