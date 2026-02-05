@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.1] - 2025-02-04
+
+### Removed
+- **`slotMatch` option** - No longer needed. The decision field for each slot is now automatically inferred from the handle bindings
+  - Before: Required `slotMatch: { widgetVariant: "contentArea" }` alongside `{ key: "contentArea", value: "form" }`
+  - After: Just define the binding - the key is inferred automatically
+- `SlotMatch` type removed from exports
+
+### Added
+- **Conflict detection** - Throws helpful error if handles for the same slot bind to different keys
+  - Example: `[Taias] Slot "primaryCta" has handles bound to different keys: "fieldA" and "fieldB"`
+
+### Changed
+- `SelectOptions` no longer accepts `slotMatch` parameter
+- `TaiasOptions` no longer accepts `slotMatch` parameter
+- Registry index now includes `slotKeyMap` for O(1) field lookup per slot
+
 ## [0.4.0] - 2025-02-04
 
 ### Added

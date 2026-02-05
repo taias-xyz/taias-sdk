@@ -1,46 +1,32 @@
 import type { Decision } from "../types";
-import type { DefaultSlots, SlotMatch, UiSelections } from "./types";
+import type { DefaultSlots, UiSelections } from "./types";
 import type { RegistryIndex } from "./indexing";
 import { makeBindingKey } from "./types";
 
-/**
- * Default slot-to-field mappings for the canonical slots.
- * Custom slots default to "nextTool" if not specified in slotMatch.
- */
-const DEFAULT_SLOT_MATCH: Record<DefaultSlots, string> = {
-  primaryCta: "nextTool",
-  secondaryCta: "nextTool",
-  widgetVariant: "nextTool",
-};
-
-export type SelectOptions<S extends string = DefaultSlots> = {
-  slotMatch?: SlotMatch<S>;
+export type SelectOptions = {
   devMode?: boolean;
   onWarn?: (msg: string) => void;
 };
 
 /**
  * Select UI affordances based on flow decision.
- * Iterates over registered slots (from index) rather than hardcoded list.
+ * Uses the inferred decision field for each slot from the registry index.
  */
 export function selectUiAffordances<S extends string = DefaultSlots>(
   decision: Decision,
   index: RegistryIndex<S>,
-  opts: SelectOptions<S> = {}
+  opts: SelectOptions = {}
 ): UiSelections<S> {
-  const slotMatch = opts.slotMatch as Record<string, string> | undefined;
   const devMode = !!opts.devMode;
   const warn = opts.onWarn ?? (() => {});
 
   const selections: UiSelections<S> = {};
 
-  // Iterate over registered slots, not hardcoded list
   for (const slot of index.slots) {
-    // Use custom slotMatch, then DEFAULT_SLOT_MATCH for canonical slots, then "nextTool"
-    const field =
-      slotMatch?.[slot] ??
-      DEFAULT_SLOT_MATCH[slot as DefaultSlots] ??
-      "nextTool";
+    // Use inferred key from handle bindings
+    const field = index.slotKeyMap.get(slot);
+    if (!field) continue;
+
     const value = decision[field];
     if (!value) continue;
 

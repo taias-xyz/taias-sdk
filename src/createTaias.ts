@@ -36,11 +36,12 @@ function generateAdvice(nextTool: string): string {
  * @example Custom slots (fully type-safe)
  * ```ts
  * type MySlots = "primaryCta" | "contentArea" | "headerStyle";
- * const taias = createTaias<MySlots>({
- *   flow,
- *   affordances,
- *   slotMatch: { contentArea: "contentArea", headerStyle: "headerStyle" },
+ * const affordances = defineAffordances<MySlots>((r) => {
+ *   r.primaryCta("cta", { key: "nextTool", value: "createUser" });
+ *   r.contentArea("content", { key: "contentArea", value: "form" });
+ *   r.headerStyle("header", { key: "headerStyle", value: "progress" });
  * });
+ * const taias = createTaias<MySlots>({ flow, affordances });
  * ```
  */
 export function createTaias<S extends string = DefaultSlots>(
@@ -49,7 +50,6 @@ export function createTaias<S extends string = DefaultSlots>(
   const {
     flow,
     affordances,
-    slotMatch,
     devMode = false,
     onMissingStep,
     onWarn,
@@ -99,7 +99,6 @@ export function createTaias<S extends string = DefaultSlots>(
       const selections = selectUiAffordances<S>(decision, registryIndex, {
         devMode,
         onWarn: warn,
-        slotMatch,
       });
 
       return {
