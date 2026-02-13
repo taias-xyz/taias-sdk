@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0] - 2026-02-13
+
+### Added
+- **`params` and `result` on `TaiasContext`** - Step handlers can now access tool input parameters and tool execution output to make conditional decisions
+  - `params`: The input parameters of the tool call (`Record<string, unknown>`)
+  - `result`: The output of the tool's execution (`Record<string, unknown>`)
+  - Both fields are optional — existing code works unchanged
+
+### Backwards Compatible
+- `params` and `result` are optional fields; omitting them produces identical behavior to previous versions
+
 ## [0.4.1] - 2025-02-04
 
 ### Removed
