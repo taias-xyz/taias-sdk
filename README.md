@@ -53,7 +53,11 @@ const taias = createTaias({
 ```ts
 // Inside your tool handler
 
-const affordances = await taias.resolve({ toolName: "scan_repo" });
+const affordances = await taias.resolve({
+  toolName: "scan_repo",
+  params: input,  // Pass tool input parameters (optional)
+  result: { language: scanResult.language },  // Pass tool output (optional)
+});
 
 let message = "Scan successful!";
 
@@ -118,7 +122,11 @@ const taias = createTaias({
 Resolves a tool call to get the suggested next step. Advice text to send the LLM is generated based on the `nextTool` specified in your step handler.
 
 ```ts
-const affordances = await taias.resolve({ toolName: "scan_repo" });
+const affordances = await taias.resolve({
+  toolName: "scan_repo",
+  params: { repoUrl: "https://github.com/..." },  // optional
+  result: { language: "python", hasConfig: true },  // optional
+});
 // affordances.advice → "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
 ```
 
@@ -126,6 +134,8 @@ const affordances = await taias.resolve({ toolName: "scan_repo" });
 
 **Parameters:**
 - `ctx.toolName` - The name of the tool being called
+- `ctx.params` - The input parameters of the tool call (optional)
+- `ctx.result` - The output of the tool's execution (optional)
 
 **Returns:** `Affordances | null`
 - Returns an `Affordances` object with `advice` (and more) if a matching step is found

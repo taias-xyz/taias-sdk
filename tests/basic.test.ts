@@ -101,6 +101,146 @@ describe("Taias", () => {
       });
     });
 
+    describe("params and result context", () => {
+      it("passes params to handler via context", async () => {
+        const handlerSpy = vi.fn((ctx: TaiasContext) => ({
+          nextTool: ctx.params?.language === "python" ? "configure_python" : "configure_generic",
+        }));
+
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", handlerSpy);
+        });
+
+        const taias = createTaias({ flow });
+        const decision = await taias.resolve({
+          toolName: "scan_repo",
+          params: { language: "python", repoUrl: "https://example.com" },
+        });
+
+        expect(handlerSpy).toHaveBeenCalledWith({
+          toolName: "scan_repo",
+          params: { language: "python", repoUrl: "https://example.com" },
+        });
+        expect(decision?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_python TOOL NEXT!!!!!"
+        );
+      });
+
+      it("passes result to handler via context", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", (ctx) => ({
+            nextTool: ctx.result?.hasConfig ? "review_config" : "create_config",
+          }));
+        });
+
+        const taias = createTaias({ flow });
+        const decision = await taias.resolve({
+          toolName: "scan_repo",
+          result: { hasConfig: true, fileCount: 42 },
+        });
+
+        expect(decision?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE review_config TOOL NEXT!!!!!"
+        );
+      });
+
+      it("handler uses both params and result for decisions", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", (ctx) => {
+            if (ctx.params?.language === "python" && ctx.result?.hasConfig) {
+              return { nextTool: "review_python_config" };
+            }
+            if (ctx.params?.language === "python") {
+              return { nextTool: "create_python_config" };
+            }
+            return { nextTool: "configure_generic" };
+          });
+        });
+
+        const taias = createTaias({ flow });
+
+        const decision1 = await taias.resolve({
+          toolName: "scan_repo",
+          params: { language: "python" },
+          result: { hasConfig: true },
+        });
+        expect(decision1?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE review_python_config TOOL NEXT!!!!!"
+        );
+
+        const decision2 = await taias.resolve({
+          toolName: "scan_repo",
+          params: { language: "python" },
+          result: { hasConfig: false },
+        });
+        expect(decision2?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE create_python_config TOOL NEXT!!!!!"
+        );
+
+        const decision3 = await taias.resolve({
+          toolName: "scan_repo",
+          params: { language: "go" },
+          result: { hasConfig: true },
+        });
+        expect(decision3?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_generic TOOL NEXT!!!!!"
+        );
+      });
+
+      it("works without params or result (backward compat)", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", () => ({
+            nextTool: "configure_app",
+          }));
+        });
+
+        const taias = createTaias({ flow });
+        const decision = await taias.resolve({ toolName: "scan_repo" });
+
+        expect(decision).not.toBeNull();
+        expect(decision?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
+        );
+      });
+
+      it("params and result are undefined when not provided", async () => {
+        const handlerSpy = vi.fn((ctx: TaiasContext) => ({
+          nextTool: "next_tool",
+        }));
+
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("my_tool", handlerSpy);
+        });
+
+        const taias = createTaias({ flow });
+        await taias.resolve({ toolName: "my_tool" });
+
+        const ctx = handlerSpy.mock.calls[0][0];
+        expect(ctx.params).toBeUndefined();
+        expect(ctx.result).toBeUndefined();
+      });
+
+      it("includes params and result in the decision object's context", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", (ctx) => ({
+            nextTool: "configure_app",
+            variant: String(ctx.params?.language ?? "unknown"),
+          }));
+        });
+
+        const taias = createTaias({ flow });
+        const affordances = await taias.resolve({
+          toolName: "scan_repo",
+          params: { language: "python" },
+        });
+
+        expect(affordances?.decision).toEqual({
+          nextTool: "configure_app",
+          variant: "python",
+        });
+      });
+    });
+
     describe("onMissingStep callback", () => {
       it("invokes onMissingStep when no step matches", async () => {
         const onMissingStep = vi.fn();
