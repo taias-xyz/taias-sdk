@@ -12,9 +12,15 @@ export type Decision = Record<string, string | undefined>;
 
 /**
  * Context passed to a step handler.
+ *
+ * - toolName: the name of the tool being executed
+ * - params: the input parameters of the tool call (optional)
+ * - result: the output of the tool's execution (optional)
  */
 export type TaiasContext = {
   toolName: string;
+  params?: Record<string, unknown>;
+  result?: Record<string, unknown>;
 };
 
 /**
