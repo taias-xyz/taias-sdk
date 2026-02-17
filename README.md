@@ -25,14 +25,14 @@ npm install taias
 
 ## Quick Start
 
-**1. Define a flow** — Map out your tool sequence:
+**1. Define a flow** — Express your logic as structured data:
 
 ```ts
 import { defineFlow, createTaias } from "taias";
 
 const flow = defineFlow("onboard", (flow) => {
-  flow.step("scan_repo", () => ({ nextTool: "configure_app" }));
-  flow.step("configure_app", () => ({ nextTool: "deploy" }));
+  flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
+  flow.step({ toolName: "configure_app" }, { nextTool: "deploy" });
 });
 ```
 
@@ -80,13 +80,11 @@ return {
 
 ### `defineFlow(flowId, builder)`
 
-Creates a flow definition.
+Creates a flow definition. Each step is a logic statement: a match condition paired with a decision.
 
 ```ts
 const myFlow = defineFlow("my_flow", (flow) => {
-  flow.step("tool_name", (ctx) => ({
-    nextTool: "next_tool_name",
-  }));
+  flow.step({ toolName: "tool_name" }, { nextTool: "next_tool_name" });
 });
 ```
 
@@ -119,7 +117,7 @@ const taias = createTaias({
 
 ### `taias.resolve(ctx)`
 
-Resolves a tool call to get the suggested next step. Advice text to send the LLM is generated based on the `nextTool` specified in your step handler.
+Resolves a tool call to get the decision and its manifestations. Evaluates the matching logic statement and produces advice text, the decision object, and UI selections.
 
 ```ts
 const affordances = await taias.resolve({
@@ -138,8 +136,8 @@ const affordances = await taias.resolve({
 - `ctx.result` - The output of the tool's execution (optional)
 
 **Returns:** `Affordances | null`
-- Returns an `Affordances` object with `advice` (and more) if a matching step is found
-- Returns `null` if no step matches or handler returns null
+- Returns an `Affordances` object with `advice`, `decision`, and `selections` if a matching step is found
+- Returns `null` if no step matches
 
 See the [full documentation](https://taias.xyz/docs) for complete API reference and types.
 
@@ -150,12 +148,12 @@ See the [full documentation](https://taias.xyz/docs) for complete API reference 
 
 When `devMode: true`, Taias performs additional validation:
 
-1. **Duplicate toolName detection** — Throws an error if a flow defines the same tool name twice:
+1. **Duplicate match condition detection** — Throws an error if a flow defines two steps with the same match condition:
    ```
-   Taias: Duplicate step for tool 'scan_repo' in flow 'onboard_repo'. Only one handler per tool is supported.
+   Taias: Duplicate match condition 'scan_repo' in flow 'onboard_repo'. Each step must have a unique match condition.
    ```
 
-2. **Empty nextTool warning** — Logs a warning if a handler returns empty nextTool:
+2. **Empty nextTool warning** — Logs a warning if a logic statement has an empty nextTool:
    ```
    Taias: nextTool for tool 'scan_repo' is empty.
    ```
