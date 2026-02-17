@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { defineFlow, createTaias } from "../src";
-import type { TaiasContext } from "../src";
+import type { TaiasContext, FlowStep } from "../src";
 
 describe("Taias", () => {
   describe("defineFlow", () => {
-    it("creates a flow definition with id and steps", () => {
+    it("creates a flow definition with id and steps (handler form)", () => {
       const flow = defineFlow("test_flow", (flow) => {
         flow.step("tool_a", () => ({ nextTool: "tool_b" }));
         flow.step("tool_b", () => ({ nextTool: "tool_c" }));
@@ -12,8 +12,14 @@ describe("Taias", () => {
 
       expect(flow.id).toBe("test_flow");
       expect(flow.steps).toHaveLength(2);
-      expect(flow.steps[0].toolName).toBe("tool_a");
-      expect(flow.steps[1].toolName).toBe("tool_b");
+
+      // Handler-based steps have kind "handler" and match condition
+      const step0 = flow.steps[0];
+      const step1 = flow.steps[1];
+      expect(step0.kind).toBe("handler");
+      expect(step1.kind).toBe("handler");
+      if (step0.kind === "handler") expect(step0.match.toolName).toBe("tool_a");
+      if (step1.kind === "handler") expect(step1.match.toolName).toBe("tool_b");
     });
 
     it("creates an empty flow when no steps are defined", () => {
@@ -270,18 +276,18 @@ describe("Taias", () => {
     });
 
     describe("devMode", () => {
-      it("throws on duplicate toolName in devMode", () => {
+      it("throws on duplicate match condition in devMode", () => {
         const flow = defineFlow("test_flow", (flow) => {
           flow.step("scan_repo", () => ({ nextTool: "first" }));
           flow.step("scan_repo", () => ({ nextTool: "second" }));
         });
 
         expect(() => createTaias({ flow, devMode: true })).toThrow(
-          "Taias: Duplicate step for tool 'scan_repo' in flow 'test_flow'. Only one handler per tool is supported."
+          "Taias: Duplicate match condition 'scan_repo' in flow 'test_flow'. Each step must have a unique match condition."
         );
       });
 
-      it("does not throw on duplicate toolName when devMode is false", () => {
+      it("does not throw on duplicate match condition when devMode is false", () => {
         const flow = defineFlow("test_flow", (flow) => {
           flow.step("scan_repo", () => ({ nextTool: "first" }));
           flow.step("scan_repo", () => ({ nextTool: "second" }));
@@ -290,7 +296,7 @@ describe("Taias", () => {
         expect(() => createTaias({ flow, devMode: false })).not.toThrow();
       });
 
-      it("does not throw on duplicate toolName when devMode is not specified", () => {
+      it("does not throw on duplicate match condition when devMode is not specified", () => {
         const flow = defineFlow("test_flow", (flow) => {
           flow.step("scan_repo", () => ({ nextTool: "first" }));
           flow.step("scan_repo", () => ({ nextTool: "second" }));
@@ -345,7 +351,7 @@ describe("Taias", () => {
           // Should not have the "empty nextTool" warning
           // (may have other devMode warnings like missing affordances, which is fine)
           const emptyNextToolWarning = consoleWarnSpy.mock.calls.find(
-            (call) => call[0]?.includes("is empty")
+            (call) => (call[0] as string)?.includes("is empty")
           );
           expect(emptyNextToolWarning).toBeUndefined();
         });
@@ -353,12 +359,281 @@ describe("Taias", () => {
     });
   });
 
+  describe("logic statements", () => {
+    describe("defineFlow with static decisions", () => {
+      it("creates logic-based FlowSteps when given a plain object", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app" });
+        });
+
+        expect(flow.steps).toHaveLength(1);
+        const step = flow.steps[0];
+        expect(step.kind).toBe("logic");
+        if (step.kind === "logic") {
+          expect(step.statement.match.toolName).toBe("scan_repo");
+          expect(step.statement.decision).toEqual({ nextTool: "configure_app" });
+        }
+      });
+
+      it("creates logic-based FlowSteps with custom decision fields", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app", variant: "python" });
+        });
+
+        const step = flow.steps[0];
+        expect(step.kind).toBe("logic");
+        if (step.kind === "logic") {
+          expect(step.statement.decision).toEqual({
+            nextTool: "configure_app",
+            variant: "python",
+          });
+        }
+      });
+
+      it("creates handler-based FlowSteps when given a function", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", () => ({ nextTool: "configure_app" }));
+        });
+
+        const step = flow.steps[0];
+        expect(step.kind).toBe("handler");
+        if (step.kind === "handler") {
+          expect(step.match.toolName).toBe("scan_repo");
+          expect(typeof step.handler).toBe("function");
+        }
+      });
+
+      it("supports mixing logic and handler steps in the same flow", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("tool_a", { nextTool: "tool_b" });
+          flow.step("tool_b", () => ({ nextTool: "tool_c" }));
+          flow.step("tool_c", { nextTool: "tool_d" });
+        });
+
+        expect(flow.steps).toHaveLength(3);
+        expect(flow.steps[0].kind).toBe("logic");
+        expect(flow.steps[1].kind).toBe("handler");
+        expect(flow.steps[2].kind).toBe("logic");
+      });
+    });
+
+    describe("resolve with logic statements", () => {
+      it("returns correct advice from a static logic statement", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "scan_repo" });
+
+        expect(result).not.toBeNull();
+        expect(result?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
+        );
+      });
+
+      it("returns correct decision object from a logic statement", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app", variant: "python" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "scan_repo" });
+
+        expect(result?.decision).toEqual({
+          nextTool: "configure_app",
+          variant: "python",
+        });
+      });
+
+      it("returns null when no step matches a logic statement flow", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "unknown_tool" });
+
+        expect(result).toBeNull();
+      });
+
+      it("resolves mixed flows correctly", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("tool_a", { nextTool: "tool_b" });
+          flow.step("tool_b", () => ({ nextTool: "tool_c" }));
+        });
+
+        const taias = createTaias({ flow });
+
+        const resultA = await taias.resolve({ toolName: "tool_a" });
+        expect(resultA?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE tool_b TOOL NEXT!!!!!"
+        );
+
+        const resultB = await taias.resolve({ toolName: "tool_b" });
+        expect(resultB?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE tool_c TOOL NEXT!!!!!"
+        );
+      });
+
+      it("logic statements produce identical output to equivalent handlers", async () => {
+        const logicFlow = defineFlow("logic_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app" });
+        });
+
+        const handlerFlow = defineFlow("handler_flow", (flow) => {
+          flow.step("scan_repo", () => ({ nextTool: "configure_app" }));
+        });
+
+        const logicTaias = createTaias({ flow: logicFlow });
+        const handlerTaias = createTaias({ flow: handlerFlow });
+
+        const logicResult = await logicTaias.resolve({ toolName: "scan_repo" });
+        const handlerResult = await handlerTaias.resolve({ toolName: "scan_repo" });
+
+        expect(logicResult).toEqual(handlerResult);
+      });
+    });
+
+    describe("devMode with logic statements", () => {
+      it("throws on duplicate match condition across logic statements", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "first" });
+          flow.step("scan_repo", { nextTool: "second" });
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).toThrow(
+          "Taias: Duplicate match condition 'scan_repo' in flow 'test_flow'. Each step must have a unique match condition."
+        );
+      });
+
+      it("throws on duplicate match condition across logic and handler steps", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "first" });
+          flow.step("scan_repo", () => ({ nextTool: "second" }));
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).toThrow(
+          "Taias: Duplicate match condition 'scan_repo' in flow 'test_flow'. Each step must have a unique match condition."
+        );
+      });
+
+      it("warns on empty nextTool in logic statements", async () => {
+        const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("empty_tool", { nextTool: "" });
+        });
+
+        const taias = createTaias({ flow, devMode: true });
+        await taias.resolve({ toolName: "empty_tool" });
+
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          "Taias: nextTool for tool 'empty_tool' is empty."
+        );
+
+        consoleWarnSpy.mockRestore();
+      });
+    });
+
+    describe("onMissingStep with logic statements", () => {
+      it("invokes onMissingStep when no logic statement matches", async () => {
+        const onMissingStep = vi.fn();
+
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("existing_tool", { nextTool: "next_tool" });
+        });
+
+        const taias = createTaias({ flow, onMissingStep });
+        await taias.resolve({ toolName: "missing_tool" });
+
+        expect(onMissingStep).toHaveBeenCalledWith({ toolName: "missing_tool" });
+      });
+    });
+
+    describe("MatchCondition object form", () => {
+      it("accepts a MatchCondition object as the first argument", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
+        });
+
+        expect(flow.steps).toHaveLength(1);
+        const step = flow.steps[0];
+        expect(step.kind).toBe("logic");
+        if (step.kind === "logic") {
+          expect(step.statement.match).toEqual({ toolName: "scan_repo" });
+          expect(step.statement.decision).toEqual({ nextTool: "configure_app" });
+        }
+      });
+
+      it("MatchCondition object form resolves correctly", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "scan_repo" });
+
+        expect(result).not.toBeNull();
+        expect(result?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
+        );
+      });
+
+      it("MatchCondition object form works with handler functions", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: "scan_repo" }, () => ({ nextTool: "configure_app" }));
+        });
+
+        const step = flow.steps[0];
+        expect(step.kind).toBe("handler");
+        if (step.kind === "handler") {
+          expect(step.match).toEqual({ toolName: "scan_repo" });
+        }
+      });
+
+      it("string and MatchCondition forms produce identical results", async () => {
+        const stringFlow = defineFlow("string_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app" });
+        });
+
+        const objectFlow = defineFlow("object_flow", (flow) => {
+          flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
+        });
+
+        const stringTaias = createTaias({ flow: stringFlow });
+        const objectTaias = createTaias({ flow: objectFlow });
+
+        const stringResult = await stringTaias.resolve({ toolName: "scan_repo" });
+        const objectResult = await objectTaias.resolve({ toolName: "scan_repo" });
+
+        expect(stringResult).toEqual(objectResult);
+      });
+    });
+  });
+
   describe("integration", () => {
-    it("works with the documented example", async () => {
+    it("works with the documented example (handler form)", async () => {
       const flow = defineFlow("onboard_repo", (flow) => {
         flow.step("scan_repo", () => ({
           nextTool: "configure_app",
         }));
+      });
+
+      const taias = createTaias({ flow });
+
+      const decision = await taias.resolve({ toolName: "scan_repo" });
+      expect(decision?.advice).toBe(
+        "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
+      );
+
+      const nullDecision = await taias.resolve({ toolName: "unknown_tool" });
+      expect(nullDecision).toBeNull();
+    });
+
+    it("works with the documented example (logic statement form)", async () => {
+      const flow = defineFlow("onboard_repo", (flow) => {
+        flow.step("scan_repo", { nextTool: "configure_app" });
       });
 
       const taias = createTaias({ flow });

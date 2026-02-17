@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.6.0] - 2026-02-17
+
+### Added
+- **Logic statements** - Flow logic is now a first-class domain concept expressed as structured data
+  - `LogicStatement` type: `{ match: MatchCondition; decision: StepDecision }` -- the core primitive of the decision engine
+  - `MatchCondition` type: currently `{ toolName: string }`, designed to expand with additional match fields
+  - `StepInput` type: union of `StepHandler | StepDecision` accepted by `flow.step()`
+- **`FlowStep` discriminated union** - Steps are now `{ kind: "logic"; statement: LogicStatement }` or `{ kind: "handler"; match: MatchCondition; handler: StepHandler }`
+  - Logic-based steps: the statement is the sole source of truth for match conditions and decision
+  - Handler-based steps: backwards-compatible escape hatch for function-based logic, with match condition stored alongside handler
+- **`flow.step()` accepts `MatchCondition` as first argument** - The match condition is now a structured object, not a bare toolName
+  - `flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" })` -- explicit match condition
+  - `flow.step("scan_repo", { nextTool: "configure_app" })` -- string sugar for `{ toolName: "scan_repo" }`
+  - Both forms work with logic statements (static decisions) and handler functions (backwards compatibility)
+
+### Changed
+- `FlowBuilder.step()` first argument is now `string | MatchCondition` (was `string`)
+- Handler-based `FlowStep` stores `match: MatchCondition` instead of bare `toolName: string`
+- `createTaias` build-time indexing derives keys from match conditions generically (not hardcoded to toolName)
+- Resolve path branches on `FlowStep.kind`: logic statements return the decision directly (no function invocation), handler steps call the function
+- Dev mode duplicate detection checks match conditions, not just toolName strings
+
+### Backwards Compatible
+- String form `flow.step("scan_repo", ...)` still works as sugar for `{ toolName: "scan_repo" }`
+- All existing handler-based code works unchanged
+- `resolve()` output shape is identical for both logic and handler steps
+
 ## [0.5.0] - 2026-02-13
 
 ### Added
