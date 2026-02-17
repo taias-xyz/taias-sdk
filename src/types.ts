@@ -54,13 +54,49 @@ export type StepHandler = (
   ctx: TaiasContext
 ) => StepDecision | null | Promise<StepDecision | null>;
 
+// ---------------------------------------------------------------------------
+// Logic statements
+// ---------------------------------------------------------------------------
+
 /**
- * A step within a flow, mapping a tool name to its handler.
+ * Match condition for a logic statement.
+ * Currently only supports toolName matching.
+ * Designed to expand with additional fields (params conditions, state, etc.).
  */
-export type FlowStep = {
+export type MatchCondition = {
   toolName: string;
-  handler: StepHandler;
 };
+
+/**
+ * A declarative logic statement -- the core primitive of the decision engine.
+ *
+ * Formalizes the implicit "Given X, then Y" logic into structured data
+ * that Taias can understand, validate, and optimize.
+ *
+ * - match: the conditions under which this statement applies
+ * - decision: the decision to produce when matched
+ */
+export type LogicStatement = {
+  match: MatchCondition;
+  decision: StepDecision;
+};
+
+// ---------------------------------------------------------------------------
+// Flow steps
+// ---------------------------------------------------------------------------
+
+/**
+ * A step within a flow. Discriminated union:
+ *
+ * - "logic": A declarative logic statement. The statement is the sole source
+ *   of truth for its match conditions and decision.
+ * - "handler": A handler function (backwards-compatible escape hatch).
+ *   The match condition is stored alongside the handler since the function
+ *   itself has no formal match conditions.
+ */
+export type FlowStep =
+  | { kind: "logic"; statement: LogicStatement }
+  | { kind: "handler"; match: MatchCondition; handler: StepHandler };
 
 /**
  * A complete flow definition with an id and its steps.
@@ -71,10 +107,22 @@ export type FlowDefinition = {
 };
 
 /**
+ * The input accepted by flow.step() -- either a handler function
+ * or a static StepDecision object.
+ */
+export type StepInput = StepHandler | StepDecision;
+
+/**
  * Builder interface for defining flow steps.
+ *
+ * step() takes two arguments:
+ *   - match: a MatchCondition object describing the conditions under which
+ *     this step applies. A string is sugar for { toolName: string }.
+ *   - input: a StepDecision object (creates a logic statement).
+ *     A StepHandler function is also accepted for backwards compatibility.
  */
 export interface FlowBuilder {
-  step(toolName: string, handler: StepHandler): void;
+  step(match: string | MatchCondition, input: StepInput): void;
 }
 
 /**

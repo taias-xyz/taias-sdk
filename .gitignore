@@ -28,3 +28,6 @@ Thumbs.db
 
 # npm pack test files
 *.tgz
+
+# Local
+local/
