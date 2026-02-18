@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.0] - 2026-02-18
+
+### Added
+- **Operator system for match conditions** - Field conditions now support explicit comparison operators, enabling richer matching logic beyond simple equality
+  - `Condition` type: `{ is: string } | { isNot: string }` -- pure data operators, no wrapper functions
+  - `FieldCondition` type: `string | Condition` -- a bare string remains sugar for `{ is: string }`
+  - `flow.step({ toolName: { is: "scan_repo" } }, ...)` -- explicit equality
+  - `flow.step({ toolName: { isNot: "abort_session" } }, ...)` -- negation matching
+- **Dual-path resolve strategy** - Build-time indexing adapts to the operators present in the flow
+  - **Fast path**: When all steps use indexable operators (`is` / string sugar), resolve uses O(1) Map lookup (identical performance to v0.6.0)
+  - **Full evaluation**: When any step uses non-indexable operators (`isNot`), resolve evaluates all steps in definition order (first match wins)
+- **`Condition` and `FieldCondition` types exported** from `taias`
+
+### Changed
+- `MatchCondition.toolName` type widened from `string` to `FieldCondition` (accepts bare string, `{ is: string }`, or `{ isNot: string }`)
+- Build-time indexing splits steps into `exactIndex` (Map for `is` conditions) and `broadSteps` (array for `isNot` conditions)
+- Dev mode duplicate detection normalizes sugar forms before comparison -- bare `"scan_repo"`, `{ toolName: "scan_repo" }`, and `{ toolName: { is: "scan_repo" } }` are all recognized as duplicates of each other
+
+### Backwards Compatible
+- All three sugar forms produce identical behavior: `"scan_repo"` = `{ toolName: "scan_repo" }` = `{ toolName: { is: "scan_repo" } }`
+- Flows using only `is` / string sugar conditions use the same O(1) Map lookup as v0.6.0
+
 ## [0.6.0] - 2026-02-17
 
 ### Added

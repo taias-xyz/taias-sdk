@@ -7,18 +7,23 @@ import type { FlowBuilder, FlowDefinition, FlowStep, MatchCondition, StepInput }
  * @param builder - Callback that receives a FlowBuilder to define steps
  * @returns A FlowDefinition object
  *
- * @example Logic statement with match condition object
+ * @example Logic statement with explicit operator
  * ```ts
  * const onboardRepoFlow = defineFlow("onboard_repo", (flow) => {
- *   flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
+ *   flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
  * });
  * ```
  *
- * @example Backwards compatibility
- * A string match and handler functions are also supported:
+ * @example isNot operator
  * ```ts
- * flow.step("scan_repo", { nextTool: "configure_app" }); // string is sugar for { toolName: "scan_repo" }
- * flow.step("scan_repo", (ctx) => ({ nextTool: "configure_app" })); // handler function
+ * flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "continue_flow" });
+ * ```
+ *
+ * @example Sugar forms (backwards compatible)
+ * Bare strings are sugar for { toolName: { is: string } }:
+ * ```ts
+ * flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" }); // sugar for { is: "scan_repo" }
+ * flow.step("scan_repo", { nextTool: "configure_app" }); // string sugar for { toolName: { is: "scan_repo" } }
  * ```
  */
 export function defineFlow(
