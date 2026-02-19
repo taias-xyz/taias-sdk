@@ -80,11 +80,13 @@ return {
 
 ### `defineFlow(flowId, builder)`
 
-Creates a flow definition. Each step is a logic statement: a match condition paired with a decision.
+Creates a flow definition. Each step is a logic statement: a match condition paired with a decision. Match condition fields support operators (`is`, `isNot`); bare strings are sugar for `{ is: "..." }`.
 
 ```ts
 const myFlow = defineFlow("my_flow", (flow) => {
-  flow.step({ toolName: "tool_name" }, { nextTool: "next_tool_name" });
+  flow.step({ toolName: { is: "tool_a" } }, { nextTool: "tool_b" });      // explicit equality
+  flow.step({ toolName: { isNot: "abort" } }, { nextTool: "continue" });   // negation
+  flow.step({ toolName: "tool_a" }, { nextTool: "tool_b" });              // bare string = sugar for { is: "tool_a" }
 });
 ```
 
