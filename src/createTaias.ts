@@ -1,4 +1,4 @@
-import type { Affordances, FlowStep, MatchCondition, StepDecision, Taias, TaiasContext, TaiasOptions, Decision } from "./types";
+import type { Affordances, Condition, FieldCondition, FlowStep, MatchCondition, StepDecision, Taias, TaiasContext, TaiasOptions, Decision } from "./types";
 import type { DefaultSlots } from "./uiAffordances/types";
 import { buildRegistryIndex } from "./uiAffordances/indexing";
 import { selectUiAffordances } from "./uiAffordances/select";
@@ -9,6 +9,59 @@ import { selectUiAffordances } from "./uiAffordances/select";
 function generateAdvice(nextTool: string): string {
   return `FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE ${nextTool} TOOL NEXT!!!!!`;
 }
+
+// ---------------------------------------------------------------------------
+// Condition normalization and evaluation
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a FieldCondition to a canonical Condition object.
+ * A bare string is sugar for { is: string }.
+ */
+function normalizeFieldCondition(field: FieldCondition): Condition {
+  return typeof field === "string" ? { is: field } : field;
+}
+
+/**
+ * Evaluate a single Condition against a value.
+ */
+function evaluateCondition(condition: Condition, value: string): boolean {
+  if ("is" in condition) return value === condition.is;
+  if ("isNot" in condition) return value !== condition.isNot;
+  return false;
+}
+
+/**
+ * Evaluate a full MatchCondition against a TaiasContext.
+ * All conditions in the match must be satisfied.
+ */
+function evaluateMatch(match: MatchCondition, ctx: TaiasContext): boolean {
+  const toolCondition = normalizeFieldCondition(match.toolName);
+  return evaluateCondition(toolCondition, ctx.toolName);
+}
+
+/**
+ * Check whether a FieldCondition is indexable (i.e., uses the `is` operator).
+ * Indexable conditions enable O(1) Map lookup at resolve time.
+ */
+function isIndexable(field: FieldCondition): boolean {
+  if (typeof field === "string") return true;
+  return "is" in field;
+}
+
+/**
+ * Extract the index key from an indexable FieldCondition.
+ * Only call this when isIndexable() returns true.
+ */
+function indexKey(field: FieldCondition): string {
+  if (typeof field === "string") return field;
+  if ("is" in field) return field.is;
+  throw new Error("Cannot derive index key from non-indexable condition");
+}
+
+// ---------------------------------------------------------------------------
+// Step access helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Get the match condition from a FlowStep.
@@ -22,15 +75,12 @@ function getMatch(step: FlowStep): MatchCondition {
 }
 
 /**
- * Derive an index key from a match condition.
- *
- * Currently all match conditions use toolName, so the key is simply
- * the toolName value. When match conditions gain additional fields,
- * this function will evolve to produce compound keys or the indexing
- * strategy will change entirely.
+ * Serialize a MatchCondition into a stable string for duplicate detection.
+ * Normalizes sugar forms so that equivalent conditions produce the same key.
  */
-function deriveIndexKey(match: MatchCondition): string {
-  return match.toolName;
+function serializeMatch(match: MatchCondition): string {
+  const normalized = normalizeFieldCondition(match.toolName);
+  return JSON.stringify({ toolName: normalized });
 }
 
 /**
@@ -84,42 +134,70 @@ export function createTaias<S extends string = DefaultSlots>(
 
   const warn = onWarn ?? ((msg: string) => console.warn(msg));
 
-  // Dev mode: Check for duplicate match conditions
+  // Dev mode: Check for duplicate match conditions.
+  // Two steps with structurally identical normalized conditions are duplicates.
   if (devMode) {
     const seenKeys = new Set<string>();
     for (const step of flow.steps) {
-      const key = deriveIndexKey(getMatch(step));
+      const key = serializeMatch(getMatch(step));
       if (seenKeys.has(key)) {
+        const match = getMatch(step);
+        const normalized = normalizeFieldCondition(match.toolName);
+        const label = "is" in normalized ? normalized.is : `isNot:${normalized.isNot}`;
         throw new Error(
-          `Taias: Duplicate match condition '${key}' in flow '${flow.id}'. Each step must have a unique match condition.`
+          `Taias: Duplicate match condition '${label}' in flow '${flow.id}'. Each step must have a unique match condition.`
         );
       }
       seenKeys.add(key);
     }
   }
 
-  // Build an internal index for efficient resolution.
+  // Build internal indexes for efficient resolution.
   //
-  // Currently all match conditions use toolName as the sole field, so a
-  // Map keyed by toolName is the right index. This is a performance
-  // optimization derived from the current set of match conditions, not a
-  // permanent architectural choice -- it will evolve when match conditions
-  // gain additional fields.
-  const stepIndex = new Map<string, FlowStep>();
+  // Steps with indexable conditions (is / string sugar) go into an exact
+  // Map for O(1) lookup. Steps with non-indexable conditions (isNot) go
+  // into a separate list. When no broad steps exist, resolve uses the
+  // fast path (Map only). When broad steps exist, resolve evaluates all
+  // steps in definition order.
+  //
+  // This indexing is a performance optimization derived from the current
+  // set of operators, not a permanent architectural choice. It will evolve
+  // as operators and match condition fields expand.
+  const exactIndex = new Map<string, FlowStep>();
+  const broadSteps: FlowStep[] = [];
+
   for (const step of flow.steps) {
-    stepIndex.set(deriveIndexKey(getMatch(step)), step);
+    const match = getMatch(step);
+    if (isIndexable(match.toolName)) {
+      exactIndex.set(indexKey(match.toolName), step);
+    } else {
+      broadSteps.push(step);
+    }
   }
+
+  const hasBroadSteps = broadSteps.length > 0;
 
   // Build affordance index once (if provided)
   const registryIndex = buildRegistryIndex<S>(affordances);
 
   return {
     async resolve(ctx: TaiasContext): Promise<Affordances<S> | null> {
-      // Find the step whose match conditions are satisfied by the context.
-      // Currently, match conditions only contain toolName, so we use the
-      // index keyed by toolName. When match conditions expand, this lookup
-      // will evolve to evaluate all relevant conditions.
-      const step = stepIndex.get(ctx.toolName);
+      let step: FlowStep | undefined;
+
+      if (!hasBroadSteps) {
+        // Fast path: all steps use indexable conditions (is / string sugar).
+        // O(1) Map lookup -- same performance as before operators were introduced.
+        step = exactIndex.get(ctx.toolName);
+      } else {
+        // Full evaluation: some steps use non-indexable conditions (isNot).
+        // Evaluate all steps in definition order; first match wins.
+        for (const candidate of flow.steps) {
+          if (evaluateMatch(getMatch(candidate), ctx)) {
+            step = candidate;
+            break;
+          }
+        }
+      }
 
       if (!step) {
         onMissingStep?.(ctx);

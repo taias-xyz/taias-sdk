@@ -612,6 +612,219 @@ describe("Taias", () => {
     });
   });
 
+  describe("operators", () => {
+    describe("is operator", () => {
+      it("explicit { is } form resolves correctly", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "scan_repo" });
+
+        expect(result).not.toBeNull();
+        expect(result?.advice).toBe(
+          "FOR THE BEST USER EXPERIENCE, TELL THE USER TO USE THE configure_app TOOL NEXT!!!!!"
+        );
+      });
+
+      it("explicit { is } form returns null for non-matching tool", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "other_tool" });
+
+        expect(result).toBeNull();
+      });
+
+      it("explicit { is } form creates logic-based FlowStep", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+        });
+
+        const step = flow.steps[0];
+        expect(step.kind).toBe("logic");
+        if (step.kind === "logic") {
+          expect(step.statement.match).toEqual({ toolName: { is: "scan_repo" } });
+          expect(step.statement.decision).toEqual({ nextTool: "configure_app" });
+        }
+      });
+    });
+
+    describe("isNot operator", () => {
+      it("matches any tool except the specified one", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "continue_flow" });
+        });
+
+        const taias = createTaias({ flow });
+
+        const result1 = await taias.resolve({ toolName: "scan_repo" });
+        expect(result1).not.toBeNull();
+        expect(result1?.decision.nextTool).toBe("continue_flow");
+
+        const result2 = await taias.resolve({ toolName: "create_user" });
+        expect(result2).not.toBeNull();
+        expect(result2?.decision.nextTool).toBe("continue_flow");
+      });
+
+      it("does not match the excluded tool", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "continue_flow" });
+        });
+
+        const taias = createTaias({ flow });
+        const result = await taias.resolve({ toolName: "abort_session" });
+
+        expect(result).toBeNull();
+      });
+
+      it("isNot works with handler functions", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { isNot: "abort_session" } }, (ctx) => ({
+            nextTool: `next_${ctx.toolName}`,
+          }));
+        });
+
+        const taias = createTaias({ flow });
+
+        const result = await taias.resolve({ toolName: "scan_repo" });
+        expect(result?.decision.nextTool).toBe("next_scan_repo");
+
+        const excluded = await taias.resolve({ toolName: "abort_session" });
+        expect(excluded).toBeNull();
+      });
+    });
+
+    describe("sugar equivalence", () => {
+      it("all three forms produce identical results", async () => {
+        const stringFlow = defineFlow("string_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "configure_app" });
+        });
+
+        const bareSugarFlow = defineFlow("bare_sugar_flow", (flow) => {
+          flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
+        });
+
+        const explicitIsFlow = defineFlow("explicit_is_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+        });
+
+        const stringTaias = createTaias({ flow: stringFlow });
+        const bareSugarTaias = createTaias({ flow: bareSugarFlow });
+        const explicitIsTaias = createTaias({ flow: explicitIsFlow });
+
+        const stringResult = await stringTaias.resolve({ toolName: "scan_repo" });
+        const bareSugarResult = await bareSugarTaias.resolve({ toolName: "scan_repo" });
+        const explicitIsResult = await explicitIsTaias.resolve({ toolName: "scan_repo" });
+
+        expect(stringResult).toEqual(bareSugarResult);
+        expect(bareSugarResult).toEqual(explicitIsResult);
+      });
+    });
+
+    describe("definition order", () => {
+      it("when both is and isNot steps match, definition order applies (is first)", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "specific_next" });
+          flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "broad_next" });
+        });
+
+        const taias = createTaias({ flow });
+
+        const result = await taias.resolve({ toolName: "scan_repo" });
+        expect(result?.decision.nextTool).toBe("specific_next");
+      });
+
+      it("when both is and isNot steps match, definition order applies (isNot first)", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "broad_next" });
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "specific_next" });
+        });
+
+        const taias = createTaias({ flow });
+
+        const result = await taias.resolve({ toolName: "scan_repo" });
+        expect(result?.decision.nextTool).toBe("broad_next");
+      });
+
+      it("isNot step catches tools not matched by is steps", async () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+          flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "continue_flow" });
+        });
+
+        const taias = createTaias({ flow });
+
+        const specific = await taias.resolve({ toolName: "scan_repo" });
+        expect(specific?.decision.nextTool).toBe("configure_app");
+
+        const broad = await taias.resolve({ toolName: "create_user" });
+        expect(broad?.decision.nextTool).toBe("continue_flow");
+
+        const excluded = await taias.resolve({ toolName: "abort_session" });
+        expect(excluded).toBeNull();
+      });
+    });
+
+    describe("devMode with operators", () => {
+      it("throws on duplicate { is } conditions", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "first" });
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "second" });
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).toThrow(
+          "Taias: Duplicate match condition 'scan_repo' in flow 'test_flow'. Each step must have a unique match condition."
+        );
+      });
+
+      it("throws on duplicate { isNot } conditions", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { isNot: "abort" } }, { nextTool: "first" });
+          flow.step({ toolName: { isNot: "abort" } }, { nextTool: "second" });
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).toThrow(
+          "Taias: Duplicate match condition 'isNot:abort' in flow 'test_flow'. Each step must have a unique match condition."
+        );
+      });
+
+      it("does not throw when { is } and { isNot } have same value (different operators)", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "first" });
+          flow.step({ toolName: { isNot: "scan_repo" } }, { nextTool: "second" });
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).not.toThrow();
+      });
+
+      it("treats bare string and { is } as duplicates", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step({ toolName: "scan_repo" }, { nextTool: "first" });
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "second" });
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).toThrow(
+          "Taias: Duplicate match condition"
+        );
+      });
+
+      it("treats full string shorthand and { is } as duplicates", () => {
+        const flow = defineFlow("test_flow", (flow) => {
+          flow.step("scan_repo", { nextTool: "first" });
+          flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "second" });
+        });
+
+        expect(() => createTaias({ flow, devMode: true })).toThrow(
+          "Taias: Duplicate match condition"
+        );
+      });
+    });
+  });
+
   describe("integration", () => {
     it("works with the documented example (handler form)", async () => {
       const flow = defineFlow("onboard_repo", (flow) => {

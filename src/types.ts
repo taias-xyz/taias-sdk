@@ -55,16 +55,44 @@ export type StepHandler = (
 ) => StepDecision | null | Promise<StepDecision | null>;
 
 // ---------------------------------------------------------------------------
+// Operators
+// ---------------------------------------------------------------------------
+
+/**
+ * A condition operator applied to a single field value.
+ *
+ * - { is: "value" }    -- exact equality (field === value)
+ * - { isNot: "value" } -- not equal    (field !== value)
+ *
+ * The operator system is pure data (not wrapper functions), aligning with
+ * the logic-as-data philosophy. New operators (oneOf, contains, etc.) can
+ * be added as union members without changing the evaluation architecture.
+ */
+export type Condition =
+  | { is: string }
+  | { isNot: string };
+
+/**
+ * A field condition is either:
+ * - A bare string: sugar for { is: string }
+ * - An explicit Condition object
+ */
+export type FieldCondition = string | Condition;
+
+// ---------------------------------------------------------------------------
 // Logic statements
 // ---------------------------------------------------------------------------
 
 /**
  * Match condition for a logic statement.
- * Currently only supports toolName matching.
- * Designed to expand with additional fields (params conditions, state, etc.).
+ *
+ * Each field accepts a FieldCondition -- either a bare value (sugar for
+ * { is: value }) or an explicit operator object ({ is: ... }, { isNot: ... }).
+ *
+ * Designed to expand with additional fields (params, result, state, etc.).
  */
 export type MatchCondition = {
-  toolName: string;
+  toolName: FieldCondition;
 };
 
 /**
