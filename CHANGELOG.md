@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.1] - 2026-02-18
+
+### Changed
+- Updated README to reflect v0.7.0 operator system (`is`, `isNot`, sugar forms)
+
 ## [0.7.0] - 2026-02-18
 
 ### Added
