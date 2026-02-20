@@ -7,23 +7,28 @@ import type { FlowBuilder, FlowDefinition, FlowStep, MatchCondition, StepInput }
  * @param builder - Callback that receives a FlowBuilder to define steps
  * @returns A FlowDefinition object
  *
- * @example Logic statement with explicit operator
+ * @example Logic statement matching on toolName
  * ```ts
  * const onboardRepoFlow = defineFlow("onboard_repo", (flow) => {
  *   flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
  * });
  * ```
  *
+ * @example Matching on params and result
+ * ```ts
+ * flow.step(
+ *   { toolName: { is: "scan_repo" }, params: { language: { is: "python" } } },
+ *   { nextTool: "configure_python" },
+ * );
+ * flow.step(
+ *   { result: { hasConfig: { is: true } } },
+ *   { nextTool: "review_config" },
+ * );
+ * ```
+ *
  * @example isNot operator
  * ```ts
  * flow.step({ toolName: { isNot: "abort_session" } }, { nextTool: "continue_flow" });
- * ```
- *
- * @example Sugar forms (backwards compatible)
- * Bare strings are sugar for { toolName: { is: string } }:
- * ```ts
- * flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" }); // sugar for { is: "scan_repo" }
- * flow.step("scan_repo", { nextTool: "configure_app" }); // string sugar for { toolName: { is: "scan_repo" } }
  * ```
  */
 export function defineFlow(
@@ -33,24 +38,14 @@ export function defineFlow(
   const steps: FlowStep[] = [];
 
   const flowBuilder: FlowBuilder = {
-    step(match: string | MatchCondition, input: StepInput): void {
-      // Normalize: string is sugar for { toolName: string }
-      const condition: MatchCondition =
-        typeof match === "string" ? { toolName: match } : match;
-
+    step(match: MatchCondition, input: StepInput): void {
       if (typeof input === "function") {
-        // Handler function -- backwards-compatible escape hatch.
-        // The match condition is stored alongside the handler since
-        // the function itself has no formal match conditions.
-        steps.push({ kind: "handler", match: condition, handler: input });
+        steps.push({ kind: "handler", match, handler: input });
       } else {
-        // Static logic statement -- the core primitive.
-        // The statement is the sole source of truth for its match
-        // conditions and decision.
         steps.push({
           kind: "logic",
           statement: {
-            match: condition,
+            match,
             decision: input,
           },
         });
@@ -65,4 +60,3 @@ export function defineFlow(
     steps,
   };
 }
-

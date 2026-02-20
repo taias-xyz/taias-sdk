@@ -61,23 +61,19 @@ export type StepHandler = (
 /**
  * A condition operator applied to a single field value.
  *
- * - { is: "value" }    -- exact equality (field === value)
- * - { isNot: "value" } -- not equal    (field !== value)
+ * - { is: value }    -- exact equality (field === value)
+ * - { isNot: value } -- not equal      (field !== value)
+ *
+ * Condition accepts unknown values, enabling matching on strings, numbers,
+ * booleans, and any other value type. Comparison uses strict equality (===).
  *
  * The operator system is pure data (not wrapper functions), aligning with
  * the logic-as-data philosophy. New operators (oneOf, contains, etc.) can
  * be added as union members without changing the evaluation architecture.
  */
 export type Condition =
-  | { is: string }
-  | { isNot: string };
-
-/**
- * A field condition is either:
- * - A bare string: sugar for { is: string }
- * - An explicit Condition object
- */
-export type FieldCondition = string | Condition;
+  | { is: unknown }
+  | { isNot: unknown };
 
 // ---------------------------------------------------------------------------
 // Logic statements
@@ -86,13 +82,19 @@ export type FieldCondition = string | Condition;
 /**
  * Match condition for a logic statement.
  *
- * Each field accepts a FieldCondition -- either a bare value (sugar for
- * { is: value }) or an explicit operator object ({ is: ... }, { isNot: ... }).
+ * All fields are optional -- steps can match on any combination of
+ * toolName, params, and result. Each field uses explicit Condition
+ * operators ({ is: ... } or { isNot: ... }).
  *
- * Designed to expand with additional fields (params, result, state, etc.).
+ * For params and result, conditions are specified per-key. Only the
+ * specified keys are checked (subset matching); unspecified keys are
+ * ignored. If a step specifies a params/result condition but the
+ * context doesn't include params/result, the step does not match.
  */
 export type MatchCondition = {
-  toolName: FieldCondition;
+  toolName?: Condition;
+  params?: Record<string, Condition>;
+  result?: Record<string, Condition>;
 };
 
 /**
@@ -145,12 +147,12 @@ export type StepInput = StepHandler | StepDecision;
  *
  * step() takes two arguments:
  *   - match: a MatchCondition object describing the conditions under which
- *     this step applies. A string is sugar for { toolName: string }.
+ *     this step applies. All fields use explicit operator objects.
  *   - input: a StepDecision object (creates a logic statement).
  *     A StepHandler function is also accepted for backwards compatibility.
  */
 export interface FlowBuilder {
-  step(match: string | MatchCondition, input: StepInput): void;
+  step(match: MatchCondition, input: StepInput): void;
 }
 
 /**

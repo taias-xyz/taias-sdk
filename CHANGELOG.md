@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.8.0] - 2026-02-14
+
+### Added
+- **`params` and `result` as first-class match condition fields** - Steps can now match on tool parameters and tool results, not just toolName
+  - `flow.step({ params: { language: { is: "python" } } }, { nextTool: "configure_python" })` -- match on a param value
+  - `flow.step({ result: { hasConfig: { is: true } } }, { nextTool: "review_config" })` -- match on a result value
+  - `flow.step({ toolName: { is: "scan_repo" }, params: { language: { is: "python" } } }, ...)` -- compound conditions
+  - Subset matching: only specified keys are checked; unspecified keys are ignored
+- **Per-field indexing** - Build-time index strategy creates a separate index for each field path constrained by `is` conditions. At resolve time, candidate sets from applicable indexes are intersected for efficient multi-field matching.
+
+### Changed
+- **`toolName` is now optional in `MatchCondition`** - Steps can match purely on `params`, `result`, or any combination of fields
+- **`Condition` type unified to `unknown` values** - `{ is: unknown } | { isNot: unknown }` replaces the string-only `{ is: string } | { isNot: string }`, enabling matching on numbers, booleans, and any other value type
+- **`FieldCondition` type removed** - Replaced by the unified `Condition` type on all fields
+- **Sugar syntax eliminated** - `flow.step()` only accepts explicit `MatchCondition` objects with operator syntax. Bare strings (`flow.step("scan_repo", ...)`) and bare field values (`{ toolName: "scan_repo" }`) are no longer supported. Use `{ toolName: { is: "scan_repo" } }` instead.
+- Build-time indexing replaced: single `exactIndex` Map replaced by per-field `fieldIndexes` with full intersection resolve
+- Indexed matches are evaluated before broad matches (steps with only non-indexable operators)
+
+### Breaking Changes
+- `flow.step()` no longer accepts a string as its first argument
+- `MatchCondition.toolName` type changed from `FieldCondition` to `Condition | undefined`
+- `FieldCondition` type removed from exports
+- All match conditions must use explicit operator objects (`{ is: ... }` or `{ isNot: ... }`)
+
 ## [0.7.1] - 2026-02-18
 
 ### Changed

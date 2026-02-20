@@ -20,7 +20,6 @@ export type {
 // Core + flow type exports
 export type {
   Condition,
-  FieldCondition,
   Decision,
   TaiasContext,
   StepDecision,
