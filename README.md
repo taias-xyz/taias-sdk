@@ -31,8 +31,8 @@ npm install taias
 import { defineFlow, createTaias } from "taias";
 
 const flow = defineFlow("onboard", (flow) => {
-  flow.step({ toolName: "scan_repo" }, { nextTool: "configure_app" });
-  flow.step({ toolName: "configure_app" }, { nextTool: "deploy" });
+  flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+  flow.step({ toolName: { is: "configure_app" } }, { nextTool: "deploy" });
 });
 ```
 
@@ -80,13 +80,20 @@ return {
 
 ### `defineFlow(flowId, builder)`
 
-Creates a flow definition. Each step is a logic statement: a match condition paired with a decision. Match condition fields support operators (`is`, `isNot`); bare strings are sugar for `{ is: "..." }`.
+Creates a flow definition. Each step is a logic statement: a match condition paired with a decision. Match conditions use explicit operators (`{ is: ... }`, `{ isNot: ... }`) and can match on `toolName`, `params`, and `result`.
 
 ```ts
 const myFlow = defineFlow("my_flow", (flow) => {
-  flow.step({ toolName: { is: "tool_a" } }, { nextTool: "tool_b" });      // explicit equality
-  flow.step({ toolName: { isNot: "abort" } }, { nextTool: "continue" });   // negation
-  flow.step({ toolName: "tool_a" }, { nextTool: "tool_b" });              // bare string = sugar for { is: "tool_a" }
+  flow.step({ toolName: { is: "tool_a" } }, { nextTool: "tool_b" });
+  flow.step({ toolName: { isNot: "abort" } }, { nextTool: "continue" });
+  flow.step(
+    { toolName: { is: "scan_repo" }, params: { language: { is: "python" } } },
+    { nextTool: "configure_python" },
+  );
+  flow.step(
+    { result: { hasConfig: { is: true } } },
+    { nextTool: "review_config" },
+  );
 });
 ```
 

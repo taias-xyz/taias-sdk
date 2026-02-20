@@ -173,7 +173,7 @@ describe("UI Affordances", () => {
   describe("resolve() with UI affordances", () => {
     it("returns selections based on flow decision", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("get_recent_tracks", () => ({
+        flow.step({ toolName: { is: "get_recent_tracks" } }, () => ({
           nextTool: "get_recommendations",
         }));
       });
@@ -199,7 +199,7 @@ describe("UI Affordances", () => {
 
     it("selects correct handle when flow changes", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("get_recent_tracks", () => ({
+        flow.step({ toolName: { is: "get_recent_tracks" } }, () => ({
           nextTool: "create_playlist",
         }));
       });
@@ -221,7 +221,7 @@ describe("UI Affordances", () => {
 
     it("returns decision object alongside selections", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "tool_b" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
       });
 
       const taias = createTaias({ flow });
@@ -232,7 +232,7 @@ describe("UI Affordances", () => {
 
     it("returns empty selections when no affordances match", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "unregistered_tool" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "unregistered_tool" }));
       });
 
       const affordances = defineAffordances((r) => {
@@ -251,7 +251,7 @@ describe("UI Affordances", () => {
 
     it("returns empty selections when no affordances registry is provided", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "tool_b" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
       });
 
       const taias = createTaias({ flow });
@@ -262,7 +262,7 @@ describe("UI Affordances", () => {
 
     it("selects handles for multiple slots simultaneously", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "tool_b" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
       });
 
       const affordances = defineAffordances((r) => {
@@ -287,7 +287,7 @@ describe("UI Affordances", () => {
   describe("multi-field decisions", () => {
     it("passes custom fields through to decision object", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({
+        flow.step({ toolName: { is: "tool_a" } }, () => ({
           nextTool: "tool_b",
           customField: "custom_value",
         }));
@@ -304,7 +304,7 @@ describe("UI Affordances", () => {
 
     it("allows different slots to match different decision fields (inferred from bindings)", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({
+        flow.step({ toolName: { is: "tool_a" } }, () => ({
           nextTool: "primary_tool",
           secondaryAction: "secondary_tool",
           contentArea: "content_variant",
@@ -333,7 +333,7 @@ describe("UI Affordances", () => {
     it("supports onboarding flow use case with independent slot decisions", async () => {
       // Simulates the developer feedback use case
       const onboardingFlow = defineFlow("onboarding_flow", (flow) => {
-        flow.step("createUser", () => ({
+        flow.step({ toolName: { is: "createUser" } }, () => ({
           nextTool: "startImport",
           primaryAction: "startImport",
           secondaryAction: "startManualSetup",
@@ -377,7 +377,7 @@ describe("UI Affordances", () => {
 
     it("maintains backwards compatibility with nextTool-only handlers", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "tool_b" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
       });
 
       const affordances = defineAffordances((r) => {
@@ -412,7 +412,7 @@ describe("UI Affordances", () => {
 
     it("warns when no affordance exists for a slot in devMode", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "unregistered_tool" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "unregistered_tool" }));
       });
 
       const affordances = defineAffordances((r) => {
@@ -434,7 +434,7 @@ describe("UI Affordances", () => {
 
     it("does not warn when devMode is false", async () => {
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "unregistered_tool" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "unregistered_tool" }));
       });
 
       const affordances = defineAffordances((r) => {
@@ -456,7 +456,7 @@ describe("UI Affordances", () => {
       const onWarn = vi.fn();
 
       const flow = defineFlow("test_flow", (flow) => {
-        flow.step("tool_a", () => ({ nextTool: "unregistered_tool" }));
+        flow.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "unregistered_tool" }));
       });
 
       const affordances = defineAffordances((r) => {
@@ -483,11 +483,11 @@ describe("UI Affordances", () => {
     it("works with the documented music discovery flow", async () => {
       // Define flow exactly as shown in docs
       const musicDiscoveryFlow = defineFlow("music_discovery_flow", (flow) => {
-        flow.step("get_recent_tracks", () => ({
+        flow.step({ toolName: { is: "get_recent_tracks" } }, () => ({
           nextTool: "get_recommendations",
         }));
 
-        flow.step("get_recommendations", () => ({
+        flow.step({ toolName: { is: "get_recommendations" } }, () => ({
           nextTool: "create_playlist",
         }));
       });
@@ -538,7 +538,7 @@ describe("UI Affordances", () => {
       type MySlots = "primaryCta" | "contentArea";
 
       const flow = defineFlow("test_flow", (f) => {
-        f.step("tool_a", () => ({
+        f.step({ toolName: { is: "tool_a" } }, () => ({
           nextTool: "tool_b",
           contentArea: "form_b",
         }));
@@ -565,7 +565,7 @@ describe("UI Affordances", () => {
       type MySlots = "contentArea";
 
       const flow = defineFlow("test_flow", (f) => {
-        f.step("tool_a", () => ({ nextTool: "tool_b" }));
+        f.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
       });
 
       const affordances = defineAffordances<MySlots>((r) => {
@@ -589,7 +589,7 @@ describe("UI Affordances", () => {
       type DashboardSlots = "headerWidget" | "mainPanel" | "sidebar";
 
       const flow = defineFlow("dashboard_flow", (f) => {
-        f.step("load_dashboard", () => ({
+        f.step({ toolName: { is: "load_dashboard" } }, () => ({
           nextTool: "refresh",
           headerWidget: "stats",
           mainPanel: "chart",
@@ -620,7 +620,7 @@ describe("UI Affordances", () => {
       type OnboardingSlots = "primaryCta" | "secondaryCta" | "contentArea" | "headerStyle";
 
       const flow = defineFlow("onboarding", (f) => {
-        f.step("createUser", () => ({
+        f.step({ toolName: { is: "createUser" } }, () => ({
           nextTool: "startImport",
           primaryAction: "startImport",
           secondaryAction: "manualSetup",
@@ -699,7 +699,7 @@ describe("UI Affordances", () => {
   describe("key inference from bindings", () => {
     it("infers decision field from affordance bindings", async () => {
       const flow = defineFlow("test_flow", (f) => {
-        f.step("tool_a", () => ({
+        f.step({ toolName: { is: "tool_a" } }, () => ({
           nextTool: "tool_b",
           customField: "custom_value",
         }));
@@ -731,7 +731,7 @@ describe("UI Affordances", () => {
       });
 
       const flow = defineFlow("test_flow", (f) => {
-        f.step("tool_a", () => ({ nextTool: "x" }));
+        f.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "x" }));
       });
 
       // Should throw when building the index (during createTaias)
@@ -747,7 +747,7 @@ describe("UI Affordances", () => {
 
     it("allows same key across different slots", async () => {
       const flow = defineFlow("test_flow", (f) => {
-        f.step("tool_a", () => ({ nextTool: "tool_b" }));
+        f.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
       });
 
       // All slots use nextTool - this is fine
@@ -771,8 +771,8 @@ describe("UI Affordances", () => {
 
     it("allows multiple handles for same slot with same key but different values", async () => {
       const flow = defineFlow("test_flow", (f) => {
-        f.step("tool_a", () => ({ nextTool: "tool_b" }));
-        f.step("tool_b", () => ({ nextTool: "tool_c" }));
+        f.step({ toolName: { is: "tool_a" } }, () => ({ nextTool: "tool_b" }));
+        f.step({ toolName: { is: "tool_b" } }, () => ({ nextTool: "tool_c" }));
       });
 
       // Multiple primaryCta handles, all using nextTool but with different values
