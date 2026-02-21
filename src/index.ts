@@ -2,6 +2,9 @@
 export { defineFlow } from "./flow";
 export { createTaias } from "./createTaias";
 
+// Observability exports
+export { createDebugSubscriber } from "./debugSubscriber";
+
 // UI affordances exports
 export { defineAffordances } from "./uiAffordances/defineAffordances";
 export { mergeAffordances } from "./uiAffordances/mergeAffordances";
@@ -33,4 +36,8 @@ export type {
   FlowBuilder,
   TaiasOptions,
   Taias,
+  ResolveEvent,
+  ResolveTrace,
+  StepEvaluation,
+  TaiasEventMap,
 } from "./types";
