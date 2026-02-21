@@ -155,6 +155,87 @@ export interface FlowBuilder {
   step(match: MatchCondition, input: StepInput): void;
 }
 
+// ---------------------------------------------------------------------------
+// Observability
+// ---------------------------------------------------------------------------
+
+/**
+ * Evaluation record for a single step during resolve().
+ * Present when tracing: "detailed" is enabled.
+ */
+export type StepEvaluation = {
+  stepIndex: number;
+  match: MatchCondition;
+  result: "matched" | "no-match";
+  fieldResults?: Record<string, {
+    condition: Condition;
+    actual: unknown;
+    passed: boolean;
+  }>;
+};
+
+/**
+ * Trace of how resolve() reached its decision.
+ *
+ * Always includes summary information (which step matched, how it was found).
+ * When tracing: "detailed", also includes per-step evaluation breakdowns.
+ */
+export type ResolveTrace = {
+  matched: boolean;
+  matchedStepIndex: number | null;
+  matchedStepKind: "logic" | "handler" | null;
+  matchedStepMatch: MatchCondition | null;
+  phase: "indexed" | "broad" | null;
+  resolutionPath: string[];
+  candidatesEvaluated: number;
+  evaluations?: StepEvaluation[];
+};
+
+/**
+ * Structured event emitted on every resolve() call.
+ *
+ * Four-part structure:
+ *   1. context  -- what was passed to resolve()
+ *   2. trace    -- how the decision was reached
+ *   3. decision -- what was decided
+ *   4. affordances -- how the decision was manifested (advice + selections)
+ */
+export type ResolveEvent<S extends string = DefaultSlots> = {
+  flowId: string;
+  timestamp: number;
+  durationMs: number;
+  context: TaiasContext;
+  trace: ResolveTrace;
+  decision: Decision | null;
+  affordances: {
+    advice: string;
+    selections: UiSelections<S>;
+  } | null;
+};
+
+/**
+ * Map of event names to their event types.
+ * Extensible to future event types (e.g., "init", "error").
+ */
+export type TaiasEventMap<S extends string = DefaultSlots> = {
+  resolve: ResolveEvent<S>;
+};
+
+// ---------------------------------------------------------------------------
+// Instance configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for the built-in debug subscriber.
+ *
+ * - format: "default" (multi-line breakdown) or "compact" (single line).
+ * - logger: Custom log function (defaults to console.log).
+ */
+export type DebugOptions = {
+  format?: "default" | "compact";
+  logger?: (...args: unknown[]) => void;
+};
+
 /**
  * Options for creating a Taias instance.
  * Generic over slot type S for custom slot support.
@@ -163,6 +244,8 @@ export type TaiasOptions<S extends string = DefaultSlots> = {
   flow: FlowDefinition;
   affordances?: AffordanceRegistry<S>;
   devMode?: boolean;
+  debug?: boolean | DebugOptions;
+  tracing?: "summary" | "detailed";
   onMissingStep?: (ctx: TaiasContext) => void;
   onWarn?: (msg: string) => void;
 };
@@ -173,4 +256,6 @@ export type TaiasOptions<S extends string = DefaultSlots> = {
  */
 export interface Taias<S extends string = DefaultSlots> {
   resolve(ctx: TaiasContext): Affordances<S> | null | Promise<Affordances<S> | null>;
+  on<E extends keyof TaiasEventMap<S>>(event: E, handler: (data: TaiasEventMap<S>[E]) => void): void;
+  off<E extends keyof TaiasEventMap<S>>(event: E, handler: (data: TaiasEventMap<S>[E]) => void): void;
 }

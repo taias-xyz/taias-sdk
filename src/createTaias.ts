@@ -1,7 +1,8 @@
-import type { Affordances, Condition, FlowStep, MatchCondition, StepDecision, Taias, TaiasContext, TaiasOptions, Decision } from "./types";
+import type { Affordances, Condition, FlowStep, MatchCondition, StepDecision, Taias, TaiasContext, TaiasOptions, Decision, ResolveEvent, ResolveTrace, StepEvaluation } from "./types";
 import type { DefaultSlots } from "./uiAffordances/types";
 import { buildRegistryIndex } from "./uiAffordances/indexing";
 import { selectUiAffordances } from "./uiAffordances/select";
+import { createDebugSubscriber } from "./debugSubscriber";
 
 /**
  * Generate advice text for a given next tool.
@@ -52,6 +53,59 @@ function evaluateMatch(match: MatchCondition, ctx: TaiasContext): boolean {
   }
 
   return true;
+}
+
+/**
+ * Evaluate a full MatchCondition and return per-field breakdown.
+ * Used when detailed tracing is enabled.
+ */
+function evaluateMatchDetailed(match: MatchCondition, ctx: TaiasContext): {
+  passed: boolean;
+  fieldResults: Record<string, { condition: Condition; actual: unknown; passed: boolean }>;
+} {
+  const fieldResults: Record<string, { condition: Condition; actual: unknown; passed: boolean }> = {};
+  let allPassed = true;
+
+  if (match.toolName) {
+    const actual = ctx.toolName;
+    const passed = evaluateCondition(match.toolName, actual);
+    fieldResults["toolName"] = { condition: match.toolName, actual, passed };
+    if (!passed) allPassed = false;
+  }
+
+  if (match.params) {
+    if (!ctx.params) {
+      for (const [key, condition] of Object.entries(match.params)) {
+        fieldResults[`params.${key}`] = { condition, actual: undefined, passed: false };
+      }
+      allPassed = false;
+    } else {
+      for (const [key, condition] of Object.entries(match.params)) {
+        const actual = ctx.params[key];
+        const passed = evaluateCondition(condition, actual);
+        fieldResults[`params.${key}`] = { condition, actual, passed };
+        if (!passed) allPassed = false;
+      }
+    }
+  }
+
+  if (match.result) {
+    if (!ctx.result) {
+      for (const [key, condition] of Object.entries(match.result)) {
+        fieldResults[`result.${key}`] = { condition, actual: undefined, passed: false };
+      }
+      allPassed = false;
+    } else {
+      for (const [key, condition] of Object.entries(match.result)) {
+        const actual = ctx.result[key];
+        const passed = evaluateCondition(condition, actual);
+        fieldResults[`result.${key}`] = { condition, actual, passed };
+        if (!passed) allPassed = false;
+      }
+    }
+  }
+
+  return { passed: allPassed, fieldResults };
 }
 
 // ---------------------------------------------------------------------------
@@ -159,11 +213,14 @@ export function createTaias<S extends string = DefaultSlots>(
     flow,
     affordances,
     devMode = false,
+    debug = false,
+    tracing = "summary",
     onMissingStep,
     onWarn,
   } = options;
 
   const warn = onWarn ?? ((msg: string) => console.warn(msg));
+  const detailed = tracing === "detailed";
 
   // Dev mode: Check for duplicate match conditions.
   if (devMode) {
@@ -228,9 +285,70 @@ export function createTaias<S extends string = DefaultSlots>(
   // Build affordance index once (if provided)
   const registryIndex = buildRegistryIndex<S>(affordances);
 
+  // -----------------------------------------------------------------------
+  // Event emitter
+  // -----------------------------------------------------------------------
+
+  const listeners = new Map<string, Set<Function>>();
+
+  function emit<E extends string>(event: E, data: unknown): void {
+    const handlers = listeners.get(event);
+    if (handlers) {
+      for (const handler of handlers) handler(data);
+    }
+  }
+
+  function on(event: string, handler: Function): void {
+    let set = listeners.get(event);
+    if (!set) {
+      set = new Set();
+      listeners.set(event, set);
+    }
+    set.add(handler);
+  }
+
+  function off(event: string, handler: Function): void {
+    listeners.get(event)?.delete(handler);
+  }
+
+  if (debug) {
+    const debugOpts = typeof debug === "object" ? debug : undefined;
+    on("resolve", createDebugSubscriber(debugOpts));
+  }
+
   return {
     async resolve(ctx: TaiasContext): Promise<Affordances<S> | null> {
+      const startTime = performance.now();
+      const timestamp = Date.now();
+
       let matchedStep: FlowStep | undefined;
+      let matchedStepIndex: number | null = null;
+      let matchPhase: "indexed" | "broad" | null = null;
+      const resolutionPath: string[] = [];
+      let candidatesEvaluated = 0;
+      const evaluations: StepEvaluation[] | undefined = detailed ? [] : undefined;
+
+      // Evaluate a candidate step and track it for tracing.
+      // In detailed mode, uses evaluateMatchDetailed to capture per-field
+      // outcomes; in summary mode, uses the cheaper evaluateMatch.
+      function tryMatch(idx: number): boolean {
+        candidatesEvaluated++;
+        const step = flow.steps[idx];
+        const match = getMatch(step);
+
+        if (detailed) {
+          const { passed, fieldResults } = evaluateMatchDetailed(match, ctx);
+          evaluations!.push({
+            stepIndex: idx,
+            match,
+            result: passed ? "matched" : "no-match",
+            fieldResults,
+          });
+          return passed;
+        }
+
+        return evaluateMatch(match, ctx);
+      }
 
       // Phase 1: Find candidates from per-field indexes via intersection
       const applicableFieldPaths: string[] = [];
@@ -240,6 +358,8 @@ export function createTaias<S extends string = DefaultSlots>(
           applicableFieldPaths.push(fieldPath);
         }
       }
+
+      resolutionPath.push(...applicableFieldPaths);
 
       if (applicableFieldPaths.length > 0) {
         // Build candidate sets for each applicable field and intersect
@@ -276,8 +396,10 @@ export function createTaias<S extends string = DefaultSlots>(
         if (candidates && candidates.size > 0) {
           const sorted = [...candidates].sort((a, b) => a - b);
           for (const idx of sorted) {
-            if (evaluateMatch(getMatch(flow.steps[idx]), ctx)) {
+            if (tryMatch(idx)) {
               matchedStep = flow.steps[idx];
+              matchedStepIndex = idx;
+              matchPhase = "indexed";
               break;
             }
           }
@@ -288,8 +410,10 @@ export function createTaias<S extends string = DefaultSlots>(
         // (i.e., steps with is conditions on fields not present in context).
         // evaluateMatch handles this correctly.
         for (const idx of indexableStepIndices) {
-          if (evaluateMatch(getMatch(flow.steps[idx]), ctx)) {
+          if (tryMatch(idx)) {
             matchedStep = flow.steps[idx];
+            matchedStepIndex = idx;
+            matchPhase = "indexed";
             break;
           }
         }
@@ -298,15 +422,42 @@ export function createTaias<S extends string = DefaultSlots>(
       // Phase 2: If no indexed match, evaluate broad steps
       if (!matchedStep && hasBroadSteps) {
         for (const idx of broadStepIndices) {
-          if (evaluateMatch(getMatch(flow.steps[idx]), ctx)) {
+          if (tryMatch(idx)) {
             matchedStep = flow.steps[idx];
+            matchedStepIndex = idx;
+            matchPhase = "broad";
             break;
           }
         }
       }
 
+      // Construct the trace and emit event on every exit path (no-match,
+      // handler-returns-null, and successful match). Subscribers always
+      // get complete visibility into every resolve() call.
+      const trace: ResolveTrace = {
+        matched: !!matchedStep,
+        matchedStepIndex,
+        matchedStepKind: matchedStep?.kind ?? null,
+        matchedStepMatch: matchedStep ? getMatch(matchedStep) : null,
+        phase: matchPhase,
+        resolutionPath,
+        candidatesEvaluated,
+        ...(evaluations !== undefined ? { evaluations } : {}),
+      };
+
       if (!matchedStep) {
         onMissingStep?.(ctx);
+
+        emit("resolve", {
+          flowId: flow.id,
+          timestamp,
+          durationMs: performance.now() - startTime,
+          context: ctx,
+          trace,
+          decision: null,
+          affordances: null,
+        } satisfies ResolveEvent<S>);
+
         return null;
       }
 
@@ -319,7 +470,19 @@ export function createTaias<S extends string = DefaultSlots>(
         result = await matchedStep.handler(ctx);
       }
 
-      if (!result) return null;
+      if (!result) {
+        emit("resolve", {
+          flowId: flow.id,
+          timestamp,
+          durationMs: performance.now() - startTime,
+          context: ctx,
+          trace,
+          decision: null,
+          affordances: null,
+        } satisfies ResolveEvent<S>);
+
+        return null;
+      }
 
       if (devMode && result.nextTool === "") {
         warn(`Taias: nextTool for tool '${ctx.toolName}' is empty.`);
@@ -332,11 +495,22 @@ export function createTaias<S extends string = DefaultSlots>(
         onWarn: warn,
       });
 
-      return {
-        advice: generateAdvice(result.nextTool),
+      const advice = generateAdvice(result.nextTool);
+
+      emit("resolve", {
+        flowId: flow.id,
+        timestamp,
+        durationMs: performance.now() - startTime,
+        context: ctx,
+        trace,
         decision,
-        selections,
-      };
+        affordances: { advice, selections },
+      } satisfies ResolveEvent<S>);
+
+      return { advice, decision, selections };
     },
+
+    on: on as Taias<S>["on"],
+    off: off as Taias<S>["off"],
   };
 }
