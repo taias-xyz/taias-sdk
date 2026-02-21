@@ -36,6 +36,7 @@ export type {
   FlowBuilder,
   TaiasOptions,
   Taias,
+  DebugOptions,
   ResolveEvent,
   ResolveTrace,
   StepEvaluation,

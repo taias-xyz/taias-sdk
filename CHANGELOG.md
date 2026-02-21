@@ -3,18 +3,20 @@
 ## [0.9.0] - 2026-02-14
 
 ### Added
+- **`debug` option on `createTaias`** - Enable built-in debug output with a single config toggle
+  - `debug: true` -- multi-line breakdown to console on every `resolve()` call
+  - `debug: { format: "compact" }` -- single-line output
+  - `debug: { logger: fn }` -- route output to any logging framework
+  - No extra imports or wiring needed
 - **Observability via event emitter** - Every `resolve()` call emits a structured `ResolveEvent` containing context, trace, decision, and affordances
-  - `taias.on("resolve", handler)` / `taias.off("resolve", handler)` -- typed event subscription/unsubscription
+  - `taias.on("resolve", handler)` / `taias.off("resolve", handler)` -- typed event subscription/unsubscription for advanced/programmatic use
   - `TaiasEventMap` type maps event names to payloads, extensible to future event types
 - **Resolve tracing** - Two trace levels capture how the decision was reached
   - **Summary trace** (always-on): Which step matched, which phase found it (indexed/broad), which field indexes were consulted, the matched step's match condition, candidates evaluated count. Negligible performance cost.
   - **Detailed trace** (opt-in via `tracing: "detailed"`): Additionally records per-step evaluation breakdowns with per-field condition outcomes (expected, actual, passed/failed)
-- **`createDebugSubscriber()`** - Built-in utility for pretty-printing resolve events
-  - Default format: multi-line breakdown of context, trace, decision, and affordances
-  - Compact format: single line per resolve call (e.g., `[Taias] scan_repo → nextTool=configure_app (indexed, step 0, 1 evaluated)`)
-  - Accepts custom `logger` function for integration with any logging framework
-- New exported types: `ResolveEvent`, `ResolveTrace`, `StepEvaluation`, `TaiasEventMap`
-- `tracing` option on `TaiasOptions`: `"summary"` (default) or `"detailed"`
+- **`createDebugSubscriber()`** - Advanced utility for programmatic use with the event emitter (auto-wired by the `debug` option for most use cases)
+- New exported types: `ResolveEvent`, `ResolveTrace`, `StepEvaluation`, `TaiasEventMap`, `DebugOptions`
+- `debug` and `tracing` options on `TaiasOptions`
 
 ### Changed
 - `Taias<S>` interface now includes `on()` and `off()` methods for event subscription

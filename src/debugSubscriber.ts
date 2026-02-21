@@ -1,9 +1,21 @@
-import type { ResolveEvent } from "./types";
+import type { ResolveEvent, TaiasContext, DebugOptions } from "./types";
 
-export type DebugSubscriberOptions = {
-  format?: "default" | "compact";
-  logger?: (...args: unknown[]) => void;
-};
+export type DebugSubscriberOptions = DebugOptions;
+
+function formatContext(context: TaiasContext): string {
+  const parts: string[] = [];
+  if (context.toolName) parts.push(`toolName=${context.toolName}`);
+  if (context.params) parts.push(`params=${JSON.stringify(context.params)}`);
+  if (context.result) parts.push(`result=${JSON.stringify(context.result)}`);
+  return parts.length > 0 ? parts.join(", ") : "(empty)";
+}
+
+function formatContextLabel(context: TaiasContext): string {
+  if (context.toolName) return context.toolName;
+  if (context.params) return `params:${JSON.stringify(context.params)}`;
+  if (context.result) return `result:${JSON.stringify(context.result)}`;
+  return "(empty)";
+}
 
 /**
  * Create a debug subscriber for Taias resolve events.
@@ -22,9 +34,10 @@ export function createDebugSubscriber(
   if (format === "compact") {
     return (event: ResolveEvent) => {
       const { trace, context } = event;
+      const label = formatContextLabel(context);
 
       if (!trace.matched) {
-        log(`[Taias] ${context.toolName} → no match (${trace.candidatesEvaluated} evaluated)`);
+        log(`[Taias] ${label} → no match (${trace.candidatesEvaluated} evaluated)`);
         return;
       }
 
@@ -33,7 +46,7 @@ export function createDebugSubscriber(
         : "null";
 
       log(
-        `[Taias] ${context.toolName} → ${decisionSummary} (${trace.phase}, step ${trace.matchedStepIndex}, ${trace.candidatesEvaluated} evaluated)`
+        `[Taias] ${label} → ${decisionSummary} (${trace.phase}, step ${trace.matchedStepIndex}, ${trace.candidatesEvaluated} evaluated)`
       );
     };
   }
@@ -44,14 +57,7 @@ export function createDebugSubscriber(
 
     lines.push("┌─ Taias Resolve ─────────────────────────────");
     lines.push(`│ Flow: ${event.flowId}`);
-    lines.push(`│ Context: toolName=${context.toolName}`);
-
-    if (context.params) {
-      lines.push(`│   params: ${JSON.stringify(context.params)}`);
-    }
-    if (context.result) {
-      lines.push(`│   result: ${JSON.stringify(context.result)}`);
-    }
+    lines.push(`│ Context: ${formatContext(context)}`);
 
     lines.push("│");
 

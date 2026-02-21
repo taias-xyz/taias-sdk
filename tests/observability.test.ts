@@ -505,4 +505,185 @@ describe("Observability", () => {
       expect(event.affordances).toBeNull();
     });
   });
+
+  describe("debug option", () => {
+    it("debug: true auto-wires the debug subscriber", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const taias = createTaias({ flow, debug: true });
+      await taias.resolve({ toolName: "scan_repo" });
+
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      const output: string = logSpy.mock.calls[0][0];
+      expect(output).toContain("Taias Resolve");
+      expect(output).toContain("scan_repo");
+      expect(output).toContain("nextTool=configure_app");
+
+      logSpy.mockRestore();
+    });
+
+    it("debug: false (default) produces no output", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const taias = createTaias({ flow });
+      await taias.resolve({ toolName: "scan_repo" });
+
+      expect(logSpy).not.toHaveBeenCalled();
+
+      logSpy.mockRestore();
+    });
+
+    it("debug: { format: 'compact' } produces compact output", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const taias = createTaias({ flow, debug: { format: "compact" } });
+      await taias.resolve({ toolName: "scan_repo" });
+
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      const output: string = logSpy.mock.calls[0][0];
+      expect(output).toContain("[Taias]");
+      expect(output).toContain("scan_repo");
+      expect(output).not.toContain("\n");
+
+      logSpy.mockRestore();
+    });
+
+    it("debug: { logger: fn } routes output to custom logger", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+      });
+
+      const logger = vi.fn();
+      const taias = createTaias({ flow, debug: { logger } });
+      await taias.resolve({ toolName: "scan_repo" });
+
+      expect(logger).toHaveBeenCalledTimes(1);
+      const output: string = logger.mock.calls[0][0];
+      expect(output).toContain("Taias Resolve");
+    });
+
+    it("debug: true with tracing: 'detailed' shows evaluations", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "tool_a" } }, { nextTool: "tool_b" });
+        flow.step({ toolName: { is: "tool_b" } }, { nextTool: "tool_c" });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const taias = createTaias({ flow, debug: true, tracing: "detailed" });
+      await taias.resolve({ toolName: "tool_b" });
+
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      const output: string = logSpy.mock.calls[0][0];
+      expect(output).toContain("Detailed evaluations");
+
+      logSpy.mockRestore();
+    });
+
+    it("debug: true coexists with manual on() subscribers", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const manualHandler = vi.fn();
+
+      const taias = createTaias({ flow, debug: true });
+      taias.on("resolve", manualHandler);
+
+      await taias.resolve({ toolName: "scan_repo" });
+
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(manualHandler).toHaveBeenCalledTimes(1);
+
+      logSpy.mockRestore();
+    });
+  });
+
+  describe("toolName-optional context display", () => {
+    it("default format displays context without toolName", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step(
+          { params: { language: { is: "python" } } },
+          { nextTool: "python_handler" },
+        );
+      });
+
+      const logger = vi.fn();
+      const taias = createTaias({ flow, debug: { logger } });
+      await taias.resolve({ toolName: "any", params: { language: "python" } });
+
+      const output: string = logger.mock.calls[0][0];
+      expect(output).toContain("params");
+      expect(output).toContain("python");
+    });
+
+    it("compact format uses toolName when present", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
+      });
+
+      const logger = vi.fn();
+      const taias = createTaias({ flow, debug: { format: "compact", logger } });
+      await taias.resolve({ toolName: "scan_repo" });
+
+      const output: string = logger.mock.calls[0][0];
+      expect(output).toContain("[Taias] scan_repo");
+    });
+
+    it("compact format falls back to params when toolName absent", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step(
+          { params: { language: { is: "python" } } },
+          { nextTool: "python_handler" },
+        );
+      });
+
+      const logger = vi.fn();
+      const taias = createTaias({ flow, debug: { format: "compact", logger } });
+      await taias.resolve({ toolName: "", params: { language: "python" } });
+
+      const output: string = logger.mock.calls[0][0];
+      expect(output).toContain("[Taias] params:");
+      expect(output).toContain("python");
+    });
+
+    it("default format shows all present context fields", async () => {
+      const flow = defineFlow("obs_flow", (flow) => {
+        flow.step(
+          {
+            toolName: { is: "analyze" },
+            params: { language: { is: "typescript" } },
+            result: { hasConfig: { is: true } },
+          },
+          { nextTool: "review" },
+        );
+      });
+
+      const logger = vi.fn();
+      const taias = createTaias({ flow, debug: { logger } });
+      await taias.resolve({
+        toolName: "analyze",
+        params: { language: "typescript" },
+        result: { hasConfig: true },
+      });
+
+      const output: string = logger.mock.calls[0][0];
+      expect(output).toContain("toolName=analyze");
+      expect(output).toContain("params=");
+      expect(output).toContain("result=");
+    });
+  });
 });

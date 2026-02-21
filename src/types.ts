@@ -226,6 +226,17 @@ export type TaiasEventMap<S extends string = DefaultSlots> = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Options for the built-in debug subscriber.
+ *
+ * - format: "default" (multi-line breakdown) or "compact" (single line).
+ * - logger: Custom log function (defaults to console.log).
+ */
+export type DebugOptions = {
+  format?: "default" | "compact";
+  logger?: (...args: unknown[]) => void;
+};
+
+/**
  * Options for creating a Taias instance.
  * Generic over slot type S for custom slot support.
  */
@@ -233,6 +244,7 @@ export type TaiasOptions<S extends string = DefaultSlots> = {
   flow: FlowDefinition;
   affordances?: AffordanceRegistry<S>;
   devMode?: boolean;
+  debug?: boolean | DebugOptions;
   tracing?: "summary" | "detailed";
   onMissingStep?: (ctx: TaiasContext) => void;
   onWarn?: (msg: string) => void;

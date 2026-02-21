@@ -2,6 +2,7 @@ import type { Affordances, Condition, FlowStep, MatchCondition, StepDecision, Ta
 import type { DefaultSlots } from "./uiAffordances/types";
 import { buildRegistryIndex } from "./uiAffordances/indexing";
 import { selectUiAffordances } from "./uiAffordances/select";
+import { createDebugSubscriber } from "./debugSubscriber";
 
 /**
  * Generate advice text for a given next tool.
@@ -212,6 +213,7 @@ export function createTaias<S extends string = DefaultSlots>(
     flow,
     affordances,
     devMode = false,
+    debug = false,
     tracing = "summary",
     onMissingStep,
     onWarn,
@@ -307,6 +309,11 @@ export function createTaias<S extends string = DefaultSlots>(
 
   function off(event: string, handler: Function): void {
     listeners.get(event)?.delete(handler);
+  }
+
+  if (debug) {
+    const debugOpts = typeof debug === "object" ? debug : undefined;
+    on("resolve", createDebugSubscriber(debugOpts));
   }
 
   return {

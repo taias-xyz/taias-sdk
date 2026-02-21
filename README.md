@@ -120,6 +120,8 @@ const taias = createTaias({
 **Options:**
 - `flow` - A `FlowDefinition` created by `defineFlow`
 - `devMode` (optional) - Enable development mode checks
+- `debug` (optional) - `true` or `{ format, logger }` -- enable built-in debug output
+- `tracing` (optional) - `"summary"` (default) or `"detailed"` -- controls trace depth
 - `onMissingStep` (optional) - Callback invoked when no step matches
 
 **Returns:** `Taias` instance
@@ -149,6 +151,31 @@ const affordances = await taias.resolve({
 - Returns `null` if no step matches
 
 See the [full documentation](https://taias.xyz/docs) for complete API reference and types.
+
+## Observability
+
+Enable debug output with a single option:
+
+```ts
+const taias = createTaias({ flow, debug: true });
+```
+
+Every `resolve()` call prints a formatted breakdown to the console -- what went in, how the decision was reached, and what was produced.
+
+For compact single-line output:
+
+```ts
+const taias = createTaias({ flow, debug: { format: "compact" } });
+// [Taias] scan_repo → nextTool=configure_app (indexed, step 0, 1 evaluated)
+```
+
+Enable detailed tracing for per-step evaluation breakdowns (verbose -- best used when debugging specific resolve calls):
+
+```ts
+const taias = createTaias({ flow, debug: true, tracing: "detailed" });
+```
+
+For programmatic access to resolve events, use the event emitter API (`taias.on` / `taias.off`). See the [full documentation](https://taias.xyz/docs) for details.
 
 ## Dev Mode
 
