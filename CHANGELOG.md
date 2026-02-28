@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.1] - 2026-02-28
+
+- Updated GitHub organization from `taias-mcp` to `taias-xyz`
+
 ## [0.9.0] - 2026-02-14
 
 ### Added
