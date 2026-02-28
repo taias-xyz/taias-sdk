@@ -1,9 +1,9 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/taias-mcp/taias/main/static/taias_dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/taias-mcp/taias/main/static/taias_light.png">
-  <img width="300" alt="Taias logo" src="https://raw.githubusercontent.com/taias-mcp/taias/main/static/taias_light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/taias-xyz/taias/main/static/taias_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/taias-xyz/taias/main/static/taias_light.png">
+  <img width="300" alt="Taias logo" src="https://raw.githubusercontent.com/taias-xyz/taias/main/static/taias_light.png">
 </picture>
 
 <br/>
