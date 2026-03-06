@@ -1,6 +1,6 @@
 {
-  "name": "taias",
-  "version": "0.9.2",
+  "name": "@taias/sdk",
+  "version": "0.10.0",
   "type": "module",
   "description": "Taias - Give your MCP server an opinion, guide your users to achieve outcomes",
   "license": "Apache-2.0",

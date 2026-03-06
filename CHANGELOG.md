@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0] - 2026-03-06
+
+- **Package renamed from `taias` to `@taias/sdk`** — Update your imports and dependency accordingly
+  - `npm install @taias/sdk`
+  - `import { ... } from "@taias/sdk"`
+
 ## [0.9.2] - 2026-03-06
 
 - Renamed repository from `taias` to `taias-sdk`
