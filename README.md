@@ -10,7 +10,7 @@
 
 www.taias.xyz
 
-[![npm version](https://img.shields.io/npm/v/@taias/sdk.svg)](https://www.npmjs.com/package/@taias/sdk)
+[![npm version](https://img.shields.io/npm/v/%40taias%2Fsdk.svg)](https://www.npmjs.com/package/@taias/sdk)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 </div>
