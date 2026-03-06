@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.2] - 2026-03-06
+
+- Renamed repository from `taias` to `taias-sdk`
+
 ## [0.9.1] - 2026-02-28
 
 - Updated GitHub organization from `taias-mcp` to `taias-xyz`
