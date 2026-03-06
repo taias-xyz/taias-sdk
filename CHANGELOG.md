@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.1] - 2026-03-06
+
+- Fixed npm version badge for scoped package name
+
 ## [0.10.0] - 2026-03-06
 
 - **Package renamed from `taias` to `@taias/sdk`** — Update your imports and dependency accordingly
