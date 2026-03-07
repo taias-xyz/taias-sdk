@@ -39,9 +39,8 @@ EOF
 
 echo "Publishing @taias/sdk@$VERSION ..."
 
-# Build and publish the main package
+# Publish the main package (prepublishOnly in package.json handles the build)
 cd "$ROOT_DIR"
-npm run build
 npm publish
 
 echo ""
@@ -50,6 +49,11 @@ echo "Publishing taias-sdk@$VERSION ..."
 # Publish the alias package (no build needed)
 cd "$ALIAS_DIR"
 npm publish
+
+# Clean up stamped files so git status stays clean
+cd "$ROOT_DIR"
+git checkout packages/taias-sdk/package.json
+rm -f packages/taias-sdk/README.md
 
 echo ""
 echo "Done — @taias/sdk@$VERSION and taias-sdk@$VERSION published."

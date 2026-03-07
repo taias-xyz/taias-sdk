@@ -1,6 +1,6 @@
 {
   "name": "taias-sdk",
-  "version": "0.10.1",
+  "version": "0.0.0",
   "type": "module",
   "main": "./index.cjs",
   "module": "./index.js",
@@ -18,7 +18,7 @@
     "index.d.ts"
   ],
   "dependencies": {
-    "@taias/sdk": "0.10.1"
+    "@taias/sdk": "0.0.0"
   },
   "publishConfig": {
     "access": "public"
