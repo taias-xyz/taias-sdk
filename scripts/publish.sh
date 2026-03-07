@@ -4,6 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ALIAS_DIR="$ROOT_DIR/packages/taias-sdk"
 
+cleanup() {
+  cd "$ROOT_DIR"
+  git checkout packages/taias-sdk/package.json 2>/dev/null || true
+  rm -f packages/taias-sdk/README.md
+}
+trap cleanup EXIT
+
 VERSION=$(node -p "require('$ROOT_DIR/package.json').version")
 
 echo "Syncing alias package metadata ..."
@@ -49,11 +56,6 @@ echo "Publishing taias-sdk@$VERSION ..."
 # Publish the alias package (no build needed)
 cd "$ALIAS_DIR"
 npm publish
-
-# Clean up stamped files so git status stays clean
-cd "$ROOT_DIR"
-git checkout packages/taias-sdk/package.json
-rm -f packages/taias-sdk/README.md
 
 echo ""
 echo "Done — @taias/sdk@$VERSION and taias-sdk@$VERSION published."
