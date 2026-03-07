@@ -10,7 +10,7 @@
 
 www.taias.xyz
 
-[![npm version](https://img.shields.io/npm/v/%40taias%2Fsdk.svg)](https://www.npmjs.com/package/@taias/sdk)
+[![npm version](https://img.shields.io/npm/v/taias-sdk.svg)](https://www.npmjs.com/package/taias-sdk)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
 </div>
@@ -20,7 +20,7 @@ Taias is a lightweight framework that helps MCP server builders influence and sh
 ## Installation
 
 ```bash
-npm install @taias/sdk
+npm install taias-sdk
 ```
 
 ## Quick Start
@@ -28,7 +28,7 @@ npm install @taias/sdk
 **1. Define a flow** — Express your logic as structured data:
 
 ```ts
-import { defineFlow, createTaias } from "@taias/sdk";
+import { defineFlow, createTaias } from "taias-sdk";
 
 const flow = defineFlow("onboard", (flow) => {
   flow.step({ toolName: { is: "scan_repo" } }, { nextTool: "configure_app" });
