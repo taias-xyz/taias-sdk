@@ -6,17 +6,38 @@ ALIAS_DIR="$ROOT_DIR/packages/taias-sdk"
 
 VERSION=$(node -p "require('$ROOT_DIR/package.json').version")
 
-echo "Publishing @taias/sdk@$VERSION ..."
+echo "Syncing alias package metadata ..."
 
-# Sync version and dependency pin to alias package
+# Sync version, dependency pin, and metadata fields from root package.json
 node -e "
 const fs = require('fs');
-const path = '$ALIAS_DIR/package.json';
-const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-pkg.version = '$VERSION';
-pkg.dependencies['@taias/sdk'] = '$VERSION';
-fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+
+const root = JSON.parse(fs.readFileSync('$ROOT_DIR/package.json', 'utf8'));
+const alias = JSON.parse(fs.readFileSync('$ALIAS_DIR/package.json', 'utf8'));
+
+alias.version = root.version;
+alias.dependencies['@taias/sdk'] = root.version;
+
+const syncFields = ['description', 'keywords', 'homepage', 'license', 'author', 'engines', 'repository'];
+for (const field of syncFields) {
+  if (root[field] !== undefined) {
+    alias[field] = root[field];
+  }
+}
+
+fs.writeFileSync('$ALIAS_DIR/package.json', JSON.stringify(alias, null, 2) + '\n');
 "
+
+# Copy README with alias note appended
+cp "$ROOT_DIR/README.md" "$ALIAS_DIR/README.md"
+cat >> "$ALIAS_DIR/README.md" << 'EOF'
+
+---
+
+> This package is an alias for [`@taias/sdk`](https://www.npmjs.com/package/@taias/sdk). Both packages are identical — use whichever you prefer.
+EOF
+
+echo "Publishing @taias/sdk@$VERSION ..."
 
 # Build and publish the main package
 cd "$ROOT_DIR"
