@@ -1,0 +1,42 @@
+{
+  "name": "taias-sdk",
+  "version": "0.10.1",
+  "type": "module",
+  "description": "Alias for @taias/sdk — install either package to use Taias",
+  "license": "Apache-2.0",
+  "author": "Taias",
+  "homepage": "https://taias.xyz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taias-xyz/taias-sdk.git",
+    "directory": "packages/taias-sdk"
+  },
+  "keywords": [
+    "mcp",
+    "ai",
+    "agent",
+    "flow",
+    "taias"
+  ],
+  "main": "./index.cjs",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.cjs",
+    "index.d.ts"
+  ],
+  "dependencies": {
+    "@taias/sdk": "0.10.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
