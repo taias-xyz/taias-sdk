@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.11.1] - 2026-03-07
+
+- Updated README to use `taias-sdk` in install command, import example, and npm badge
+
 ## [0.11.0] - 2026-03-06
 
 - Added `taias-sdk` unscoped alias package — users can now `npm install taias-sdk` and `import { ... } from "taias-sdk"` as an alternative to `@taias/sdk`
