@@ -31,3 +31,6 @@ Thumbs.db
 
 # Local
 local/
+
+# Generated alias package README (stamped at publish time)
+packages/taias-sdk/README.md

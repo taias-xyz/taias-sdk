@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.11.0] - 2026-03-06
+
+- Added `taias-sdk` unscoped alias package — users can now `npm install taias-sdk` and `import { ... } from "taias-sdk"` as an alternative to `@taias/sdk`
+- Added `npm run release` script that publishes both packages with synced versions, metadata, and README
+
 ## [0.10.1] - 2026-03-06
 
 - Fixed npm version badge for scoped package name
